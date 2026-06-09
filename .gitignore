@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 presentation/node_modules/
+presentation/.npm-cache/
 
 # Build output
 dist/

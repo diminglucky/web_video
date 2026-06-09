@@ -12,7 +12,10 @@ import {
 } from "./config.js";
 import { startRenderJob, startSynthesisJob } from "./jobs.js";
 import { buildProjectFromInput } from "./scriptPlanner.js";
+import { asyncHandler, sendError } from "./errors.js";
+import { getRuntimeHealth } from "./runtimeChecks.js";
 import {
+  deleteProject,
   listProjects,
   newProjectId,
   readProject,
@@ -29,31 +32,31 @@ ensureStorage();
 app.use(express.json({ limit: "1mb" }));
 app.use("/storage/projects", express.static(PROJECTS_DIR));
 
-app.get("/api/health", (_req, res) => {
+app.get("/api/health", asyncHandler(async (_req, res) => {
+  const runtime = await getRuntimeHealth();
   res.json({
     ok: true,
     defaultProvider: DEFAULT_TTS_PROVIDER,
     defaultVoice: DEFAULT_TTS_VOICE,
     openaiConfigured: Boolean(process.env.OPENAI_API_KEY),
-    chromeConfigured: Boolean(CHROME_EXECUTABLE_PATH),
+    chromeConfigured: runtime.chromeConfigured,
+    ffmpegConfigured: runtime.ffmpegConfigured,
+    ffprobeConfigured: runtime.ffprobeConfigured,
+    ttsConfigured: runtime.ttsConfigured,
     renderBaseUrl: RENDER_BASE_URL,
+    checks: runtime.checks,
   });
-});
+}));
 
-app.get("/api/projects", async (_req, res) => {
+app.get("/api/projects", asyncHandler(async (_req, res) => {
   res.json({ projects: await listProjects() });
-});
+}));
 
-app.get("/api/projects/:id", async (req, res, next) => {
-  try {
-    res.json(await readProject(req.params.id));
-  } catch (error) {
-    next(error);
-  }
-});
+app.get("/api/projects/:id", asyncHandler(async (req, res) => {
+  res.json(await readProject(req.params.id));
+}));
 
-app.post("/api/projects", async (req, res, next) => {
-  try {
+app.post("/api/projects", asyncHandler(async (req, res) => {
     const {
       title,
       content,
@@ -88,48 +91,37 @@ app.post("/api/projects", async (req, res, next) => {
     }
 
     res.status(201).json(await readProject(id));
-  } catch (error) {
-    next(error);
-  }
-});
+}));
 
-app.put("/api/projects/:id", async (req, res, next) => {
-  try {
+app.put("/api/projects/:id", asyncHandler(async (req, res) => {
     res.json(
       await updateProjectDraft(req.params.id, {
         title: req.body?.title,
         chapters: req.body?.chapters,
       }),
     );
-  } catch (error) {
-    next(error);
-  }
-});
+}));
 
-app.post("/api/projects/:id/synthesize", async (req, res, next) => {
-  try {
+app.delete("/api/projects/:id", asyncHandler(async (req, res) => {
+  res.json(await deleteProject(req.params.id));
+}));
+
+app.post("/api/projects/:id/synthesize", asyncHandler(async (req, res) => {
     const project = await startSynthesisJob(req.params.id, {
       provider: req.body?.ttsProvider,
       voice: req.body?.voice,
       force: Boolean(req.body?.force),
     });
     res.status(202).json(project);
-  } catch (error) {
-    next(error);
-  }
-});
+}));
 
-app.post("/api/projects/:id/render", async (req, res, next) => {
-  try {
+app.post("/api/projects/:id/render", asyncHandler(async (req, res) => {
     const project = await startRenderJob(req.params.id, {
       synthesizeFirst: Boolean(req.body?.synthesizeFirst),
       forceAudio: Boolean(req.body?.forceAudio),
     });
     res.status(202).json(project);
-  } catch (error) {
-    next(error);
-  }
-});
+}));
 
 app.use(express.static(path.join(root, "dist")));
 app.get("*", (_req, res) => {
@@ -138,7 +130,7 @@ app.get("*", (_req, res) => {
 
 app.use((error, _req, res, _next) => {
   console.error(error);
-  res.status(500).json({ error: error.message || "Internal server error" });
+  sendError(error, res);
 });
 
 app.listen(SERVER_PORT, "127.0.0.1", () => {

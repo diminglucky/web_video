@@ -11,6 +11,7 @@ import {
   projectRenderDir,
   projectVideoPath,
 } from "./config.js";
+import { failedDependency } from "./errors.js";
 
 const VIEWPORT = { width: 1920, height: 1080 };
 
@@ -19,7 +20,7 @@ export async function renderProjectVideo(project) {
     throw new Error("Project has no segments to render.");
   }
   if (!fsSync.existsSync(CHROME_EXECUTABLE_PATH)) {
-    throw new Error(
+    throw failedDependency(
       `Chrome executable not found. Set WEB_VIDEO_CHROME_PATH or install Chrome. Current: ${CHROME_EXECUTABLE_PATH}`,
     );
   }
@@ -259,10 +260,12 @@ function run(cmd, args) {
     child.stderr.on("data", (chunk) => {
       stderr += chunk.toString();
     });
-    child.on("error", reject);
+    child.on("error", (error) => {
+      reject(failedDependency(`${cmd} could not be started: ${error.message}`));
+    });
     child.on("close", (code) => {
       if (code === 0) resolve(stdout);
-      else reject(new Error(`${cmd} exited ${code}: ${stderr.trim()}`));
+      else reject(failedDependency(`${cmd} exited ${code}: ${stderr.trim()}`));
     });
   });
 }

@@ -9,6 +9,7 @@
     "dev:server": "node server/server.js",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test": "node --test",
     "preview": "vite preview",
     "extract-narrations": "tsx scripts/extract-narrations.ts",
     "synthesize-audio": "bash scripts/synthesize-audio.sh"

@@ -24,6 +24,11 @@ export async function startSynthesisJob(projectId, options = {}) {
     key,
     runJob(key, async () => {
       const current = await readProject(projectId);
+      await updateJob(projectId, "synthesize", {
+        stage: "synthesizing-audio",
+        message: "Synthesizing narration audio.",
+        progress: progress(0, current.segments?.length || 0),
+      });
       const audio = await synthesizeProjectAudio(current, {
         provider: current.tts?.provider,
         voice: current.tts?.voice,
@@ -40,7 +45,10 @@ export async function startSynthesisJob(projectId, options = {}) {
       latest.updatedAt = new Date().toISOString();
       latest.jobs = {
         ...latest.jobs,
-        synthesize: successJob(audio.length),
+        synthesize: successJob(latest.jobs?.synthesize, audio.length, {
+          stage: "audio-ready",
+          message: "Audio synthesis complete.",
+        }),
       };
       await saveProject(latest);
     }),
@@ -63,9 +71,18 @@ export async function startRenderJob(projectId, options = {}) {
         current.status = "synthesizing";
         current.jobs = {
           ...current.jobs,
-          synthesize: runningJob(),
+          synthesize: runningJob({
+            stage: "synthesizing-audio",
+            message: "Synthesizing audio before render.",
+            progress: progress(0, current.segments?.length || 0),
+          }),
           render: {
-            ...current.jobs?.render,
+            ...runningJob({
+              stage: "waiting-for-audio",
+              message: "Waiting for audio synthesis.",
+              progress: progress(0, current.segments?.length || 0),
+            }),
+            ...pickStartedAt(current.jobs?.render),
             status: "waiting-for-audio",
           },
         };
@@ -87,13 +104,27 @@ export async function startRenderJob(projectId, options = {}) {
         current.updatedAt = new Date().toISOString();
         current.jobs = {
           ...current.jobs,
-          synthesize: successJob(audio.length),
-          render: runningJob(),
+          synthesize: successJob(current.jobs?.synthesize, audio.length, {
+            stage: "audio-ready",
+            message: "Audio synthesis complete.",
+          }),
+          render: {
+            ...current.jobs?.render,
+            status: "running",
+            stage: "rendering-video",
+            message: "Capturing frames and building MP4.",
+            progress: progress(0, current.segments?.length || 0),
+          },
         };
         await saveProject(current);
       }
 
       const current = await readProject(projectId);
+      await updateJob(projectId, "render", {
+        stage: "rendering-video",
+        message: "Capturing frames and building MP4.",
+        progress: progress(0, current.segments?.length || 0),
+      });
       const video = await renderProjectVideo(current);
       const latest = await readProject(projectId);
       latest.video = video;
@@ -102,7 +133,10 @@ export async function startRenderJob(projectId, options = {}) {
       latest.jobs = {
         ...latest.jobs,
         render: {
-          ...successJob(video.frames || 0),
+          ...successJob(latest.jobs?.render, video.frames || 0, {
+            stage: "video-ready",
+            message: "MP4 export complete.",
+          }),
           durationMs: video.durationMs,
         },
       };
@@ -126,37 +160,64 @@ async function markJobStarted(projectId, kind, status, patch = {}) {
   }
   project.jobs = {
     ...project.jobs,
-    [kind]: runningJob(),
+    [kind]: runningJob({
+      stage: kind === "render" ? "queued-render" : "queued-synthesis",
+      message: kind === "render" ? "Render job queued." : "Audio synthesis queued.",
+      progress: progress(0, project.segments?.length || 0),
+    }),
   };
   await saveProject(project);
   return project;
 }
 
-function runningJob() {
+async function updateJob(projectId, kind, patch) {
+  const project = await readProject(projectId);
+  project.updatedAt = new Date().toISOString();
+  project.jobs = {
+    ...project.jobs,
+    [kind]: {
+      ...project.jobs?.[kind],
+      ...patch,
+    },
+  };
+  await saveProject(project);
+  return project;
+}
+
+function runningJob(patch = {}) {
   return {
     status: "running",
     startedAt: new Date().toISOString(),
     finishedAt: null,
     error: null,
+    stage: "running",
+    message: "Job is running.",
+    progress: progress(0, 0),
+    ...patch,
   };
 }
 
-function successJob(count) {
+function successJob(previous, count, patch = {}) {
   return {
     status: "success",
-    startedAt: null,
+    startedAt: previous?.startedAt || new Date().toISOString(),
     finishedAt: new Date().toISOString(),
     error: null,
     count,
+    progress: progress(count, count),
+    ...patch,
   };
 }
 
-function failedJob(error) {
+function failedJob(previous, error) {
   return {
     status: "failed",
-    startedAt: null,
+    startedAt: previous?.startedAt || null,
     finishedAt: new Date().toISOString(),
     error: error instanceof Error ? error.message : String(error),
+    stage: previous?.stage || "failed",
+    message: "Job failed.",
+    progress: previous?.progress || progress(0, 0),
   };
 }
 
@@ -171,7 +232,7 @@ async function runJob(key, worker) {
       project.updatedAt = new Date().toISOString();
       project.jobs = {
         ...project.jobs,
-        [kind]: failedJob(error),
+        [kind]: failedJob(project.jobs?.[kind], error),
       };
       await saveProject(project).catch(() => {});
     }
@@ -183,4 +244,16 @@ async function runJob(key, worker) {
 
 function jobKey(projectId, kind) {
   return `${projectId}:${kind}`;
+}
+
+function progress(current, total) {
+  return {
+    current,
+    total,
+    percent: total > 0 ? Math.round((current / total) * 100) : 0,
+  };
+}
+
+function pickStartedAt(job) {
+  return job?.startedAt ? { startedAt: job.startedAt } : {};
 }

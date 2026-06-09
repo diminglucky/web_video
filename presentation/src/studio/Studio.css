@@ -513,16 +513,30 @@
   max-height: min(58vh, 620px);
 }
 
-.studio-list button {
+.studio-list > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.studio-list > div > button:first-child {
   display: grid;
   gap: 5px;
   padding: 12px;
   text-align: left;
 }
 
-.studio-list button.is-active {
+.studio-list > div.is-active > button:first-child {
   border-color: var(--accent);
   box-shadow: inset 4px 0 0 var(--accent);
+}
+
+.studio-danger-action {
+  align-self: stretch;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 112, 112, 0.35);
+  color: #ffaaaa;
 }
 
 .studio-list strong,

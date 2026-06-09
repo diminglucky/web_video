@@ -1,38 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GeneratedProject } from "../generated/types";
+import {
+  createProject as createProjectRequest,
+  deleteProject,
+  fetchHealth,
+  fetchProject,
+  fetchProjects,
+  renderProject,
+  saveProjectDraft,
+  synthesizeProject,
+} from "./api";
+import {
+  EmptyState,
+  Metric,
+  ProjectLibrary,
+  ProjectSummary,
+  RuntimePanel,
+  StatusBlock,
+} from "./components";
+import { ChapterPreviewNav, DraftEditor } from "./DraftEditor";
+import { statusText } from "./status";
+import type { Health, ProjectListItem, Provider, StudioPage } from "./types";
 import "./Studio.css";
-
-type Provider = "edge-tts" | "say" | "openai" | "piper";
-type StudioPage = "compose" | "edit" | "export" | "library";
-
-interface Health {
-  ok: boolean;
-  defaultProvider: string;
-  defaultVoice: string;
-  openaiConfigured: boolean;
-  chromeConfigured: boolean;
-  renderBaseUrl: string;
-}
-
-interface ProjectListItem {
-  id: string;
-  title: string;
-  createdAt: string;
-  status?: string;
-  provider?: string;
-  segmentCount: number;
-  hasAudio?: boolean;
-  hasVideo?: boolean;
-}
-
-const STATUS_LABEL: Record<string, string> = {
-  draft: "可预览草稿",
-  ready: "已生成网页",
-  synthesizing: "合成音频中",
-  rendering: "导出 MP4 中",
-  complete: "已完成",
-  failed: "失败",
-};
 
 export function Studio() {
   const [health, setHealth] = useState<Health | null>(null);
@@ -72,30 +61,26 @@ export function Studio() {
   }, []);
 
   const refreshProjects = useCallback(async () => {
-    const res = await fetch("/api/projects");
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "项目列表加载失败");
-    setProjects(data.projects || []);
+    setProjects(await fetchProjects());
   }, []);
 
   const refreshProject = useCallback(async (id: string) => {
-    const res = await fetch(`/api/projects/${id}`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "项目加载失败");
-    setActiveProject(data);
-    loadProjectDraft(data);
+    const project = await fetchProject(id);
+    setActiveProject(project);
+    loadProjectDraft(project);
   }, [loadProjectDraft]);
 
   useEffect(() => {
     const loadInitialState = async () => {
-      const healthRes = await fetch("/api/health");
-      const data = await healthRes.json();
+      const data = await fetchHealth();
       setHealth(data);
-      if (data.defaultProvider) setProvider(data.defaultProvider);
+      if (data.defaultProvider) setProvider(data.defaultProvider as Provider);
       if (data.defaultVoice) setVoice(data.defaultVoice);
       await refreshProjects();
     };
-    void loadInitialState().catch(() => {});
+    void loadInitialState().catch((err) =>
+      setError(err instanceof Error ? err.message : String(err)),
+    );
   }, [refreshProjects]);
 
   useEffect(() => {
@@ -113,22 +98,14 @@ export function Studio() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          content,
-          ttsProvider: provider,
-          voice,
-          synthesize: false,
-          render: false,
-        }),
+      const project = await createProjectRequest({
+        title,
+        content,
+        ttsProvider: provider,
+        voice,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "生成失败");
-      setActiveProject(data);
-      loadProjectDraft(data);
+      setActiveProject(project);
+      loadProjectDraft(project);
       setActivePage("edit");
       await refreshProjects();
     } catch (err) {
@@ -143,18 +120,12 @@ export function Studio() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/projects/${activeProject.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: draftTitle,
-          chapters: draftChapters,
-        }),
+      const project = await saveProjectDraft(activeProject.id, {
+        title: draftTitle,
+        chapters: draftChapters,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "保存失败");
-      setActiveProject(data);
-      loadProjectDraft(data);
+      setActiveProject(project);
+      loadProjectDraft(project);
       await refreshProjects();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -163,27 +134,36 @@ export function Studio() {
     }
   };
 
-  const runAction = async (
-    path: string,
-    body: Record<string, unknown> = {},
-  ) => {
-    if (!activeProject) return;
-    if (draftDirty) {
-      setError("当前草稿有未保存修改。请先保存并刷新预览，再合成音频或导出 MP4。");
-      return;
-    }
+  const runSynthesize = async () => {
+    if (!activeProject || !ensureDraftSaved(draftDirty, setError)) return;
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+      const project = await synthesizeProject(activeProject.id, {
+        ttsProvider: provider,
+        voice,
+        force: false,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "操作失败");
-      setActiveProject(data);
-      loadProjectDraft(data);
+      setActiveProject(project);
+      loadProjectDraft(project);
+      await refreshProjects();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runRender = async () => {
+    if (!activeProject || !ensureDraftSaved(draftDirty, setError)) return;
+    setLoading(true);
+    setError("");
+    try {
+      const project = await renderProject(activeProject.id, {
+        synthesizeFirst: !activeProject.audio?.length,
+      });
+      setActiveProject(project);
+      loadProjectDraft(project);
       await refreshProjects();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -197,9 +177,7 @@ export function Studio() {
     return `${activeProject.chapters.length} 章 / ${activeProject.segments.length} 屏`;
   }, [activeProject]);
 
-  const previewUrl = activeProject
-    ? `/?project=${activeProject.id}`
-    : "";
+  const previewUrl = activeProject ? `/?project=${activeProject.id}` : "";
   const audioPreviewUrl = activeProject
     ? `/?project=${activeProject.id}&audio=1`
     : "";
@@ -212,11 +190,34 @@ export function Studio() {
     : "";
   const stepCount = activeProject?.segments.length || 0;
   const chapterCount = activeProject?.chapters.length || 0;
+
   const selectProject = (id: string, page: StudioPage = "edit") => {
     setActivePage(page);
     refreshProject(id).catch((err) =>
       setError(err instanceof Error ? err.message : String(err)),
     );
+  };
+
+  const removeProject = async (id: string) => {
+    const ok = window.confirm("确定删除这个项目？本地音频和 MP4 也会一起删除。");
+    if (!ok) return;
+    setLoading(true);
+    setError("");
+    try {
+      await deleteProject(id);
+      if (activeProject?.id === id) {
+        setActiveProject(null);
+        setDraftTitle("");
+        setDraftChapters([]);
+        setPreviewGlobalStep(0);
+        setActivePage("library");
+      }
+      await refreshProjects();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -267,375 +268,391 @@ export function Studio() {
       {error && <div className="studio-error studio-global-error">{error}</div>}
 
       {activePage === "compose" && (
-        <section className="studio-page studio-page-grid">
-          <div className="studio-panel studio-compose">
-            <div className="studio-section-title">
-              <div>
-                <span className="studio-panel-kicker">Step 01</span>
-                <h2>输入与配置</h2>
-                <p>生成可编辑网页草稿，先看画面和节奏，再进入后续制作。</p>
-              </div>
-              <button className="studio-primary" disabled={loading} onClick={createProject}>
-                {loading ? "提交中..." : "生成草稿"}
-              </button>
-            </div>
-
-            <label>
-              标题
-              <input value={title} onChange={(e) => setTitle(e.target.value)} />
-            </label>
-
-            <label>
-              内容 / 大纲 / 口播稿
-              <textarea value={content} onChange={(e) => setContent(e.target.value)} />
-            </label>
-
-            <div className="studio-grid">
-              <label>
-                TTS Provider
-                <select value={provider} onChange={(e) => setProvider(e.target.value as Provider)}>
-                  <option value="edge-tts">edge-tts 本地命令</option>
-                  <option value="say">macOS say 离线</option>
-                  <option value="openai">OpenAI API</option>
-                  <option value="piper">Piper 本地模型</option>
-                </select>
-              </label>
-              <label>
-                音色 / 模型音色
-                <input value={voice} onChange={(e) => setVoice(e.target.value)} />
-              </label>
-            </div>
-
-          </div>
-
-          <aside className="studio-side">
-            <ProjectSummary
-              activeProject={activeProject}
-              chapterCount={chapterCount}
-              draftDirty={draftDirty}
-              segmentStats={segmentStats}
-              stepCount={stepCount}
-            />
-            <ProjectLibrary
-              activeProject={activeProject}
-              projects={projects}
-              onSelect={(id) => selectProject(id)}
-            />
-          </aside>
-        </section>
+        <ComposePage
+          activeProject={activeProject}
+          chapterCount={chapterCount}
+          content={content}
+          draftDirty={draftDirty}
+          loading={loading}
+          onCreate={createProject}
+          onSelectProject={(id) => selectProject(id)}
+          onDeleteProject={removeProject}
+          onSetContent={setContent}
+          onSetProvider={setProvider}
+          onSetTitle={setTitle}
+          onSetVoice={setVoice}
+          projects={projects}
+          provider={provider}
+          segmentStats={segmentStats}
+          stepCount={stepCount}
+          title={title}
+          voice={voice}
+        />
       )}
 
       {activePage === "edit" && (
-        <section className="studio-page studio-page-grid wide">
-          {!activeProject ? (
-            <EmptyState
-              title="还没有可编辑草稿"
-              body="先创建一个草稿，或从项目库选择历史项目。"
-              actionLabel="去创建草稿"
-              onAction={() => setActivePage("compose")}
-            />
-          ) : (
-            <>
-              <div className="studio-panel">
-                <DraftEditor
-                  chapters={draftChapters}
-                  dirty={draftDirty}
-                  disabled={loading || isBusy}
-                  onChange={setDraftChapters}
-                  onPreviewStep={setPreviewGlobalStep}
-                  onSave={saveDraft}
-                  title={draftTitle}
-                  onTitleChange={setDraftTitle}
-                />
-              </div>
-
-              <aside className="studio-side">
-                <div className="studio-preview studio-side-section is-primary">
-                  <div className="studio-preview-head">
-                    <div>
-                      <span className="studio-panel-kicker">Live Preview</span>
-                      <h2>网页预览</h2>
-                    </div>
-                    <a href={previewUrl}>新窗口打开</a>
-                  </div>
-                  <iframe
-                    key={`${activeProject.id}-${activeProject.updatedAt || ""}-${previewGlobalStep}`}
-                    src={previewFrameUrl}
-                    title="网页视频草稿预览"
-                  />
-                  <ChapterPreviewNav
-                    chapters={draftChapters}
-                    currentGlobalStep={previewGlobalStep}
-                    onPreviewStep={setPreviewGlobalStep}
-                  />
-                </div>
-              </aside>
-            </>
-          )}
-        </section>
+        <EditPage
+          activeProject={activeProject}
+          draftChapters={draftChapters}
+          draftDirty={draftDirty}
+          draftTitle={draftTitle}
+          isBusy={isBusy}
+          loading={loading}
+          onChangeChapters={setDraftChapters}
+          onPreviewStep={setPreviewGlobalStep}
+          onSave={saveDraft}
+          onSetPage={setActivePage}
+          onTitleChange={setDraftTitle}
+          previewFrameUrl={previewFrameUrl}
+          previewGlobalStep={previewGlobalStep}
+          previewUrl={previewUrl}
+        />
       )}
 
       {activePage === "export" && (
-        <section className="studio-page studio-page-grid">
-          {!activeProject ? (
-            <EmptyState
-              title="还没有选择项目"
-              body="选择一个草稿后，再合成音频或导出 MP4。"
-              actionLabel="打开项目库"
-              onAction={() => setActivePage("library")}
-            />
-          ) : (
-            <>
-              <div className="studio-panel">
-                <div className="studio-section-title">
-                  <div>
-                    <span className="studio-panel-kicker">Step 03</span>
-                    <h2>合成与导出</h2>
-                    <p>确认草稿保存后，再生成中文口播或导出最终 MP4。</p>
-                  </div>
-                </div>
-                <StatusBlock project={activeProject} segmentStats={segmentStats} />
-                <div className="studio-metrics">
-                  <Metric label="章节" value={chapterCount || "-"} />
-                  <Metric label="屏幕" value={stepCount || "-"} />
-                  <Metric label="状态" value={statusText(activeProject.status)} />
-                </div>
-                {draftDirty && (
-                  <div className="studio-error">
-                    当前草稿有未保存修改。请回到“编辑与预览”保存后再生成产物。
-                  </div>
-                )}
-                <div className="studio-actions large">
-                  <button
-                    disabled={!activeProject || loading || isBusy || draftDirty}
-                    onClick={() =>
-                      runAction(`/api/projects/${activeProject.id}/synthesize`, {
-                        ttsProvider: provider,
-                        voice,
-                        force: false,
-                      })
-                    }
-                  >
-                    合成音频
-                  </button>
-                  <button
-                    disabled={!activeProject || loading || isBusy || draftDirty}
-                    onClick={() =>
-                      runAction(`/api/projects/${activeProject.id}/render`, {
-                        synthesizeFirst: !activeProject.audio?.length,
-                      })
-                    }
-                  >
-                    导出 MP4
-                  </button>
-                </div>
-                <div className="studio-links">
-                  {previewUrl && <a href={previewUrl}>打开预览</a>}
-                  {Boolean(activeProject.audio?.length) && (
-                    <a href={audioPreviewUrl}>带音频预览</a>
-                  )}
-                  {autoPreviewUrl && <a href={autoPreviewUrl}>自动播放</a>}
-                  {videoUrl && <a href={videoUrl}>下载 MP4</a>}
-                </div>
-              </div>
-
-              <aside className="studio-side">
-                <RuntimePanel health={health} />
-              </aside>
-            </>
-          )}
-        </section>
+        <ExportPage
+          activeProject={activeProject}
+          audioPreviewUrl={audioPreviewUrl}
+          autoPreviewUrl={autoPreviewUrl}
+          chapterCount={chapterCount}
+          draftDirty={draftDirty}
+          health={health}
+          isBusy={isBusy}
+          loading={loading}
+          onRender={runRender}
+          onSetPage={setActivePage}
+          onSynthesize={runSynthesize}
+          previewUrl={previewUrl}
+          segmentStats={segmentStats}
+          stepCount={stepCount}
+          videoUrl={videoUrl}
+        />
       )}
 
       {activePage === "library" && (
-        <section className="studio-page studio-page-grid">
-          <ProjectLibrary
-            activeProject={activeProject}
-            projects={projects}
-            variant="large"
-            onSelect={(id) => selectProject(id)}
-          />
-          <aside className="studio-side">
-            <RuntimePanel health={health} />
-            <div className="studio-note">
-              API key 只放后端 <code>.env</code>。真本地模型可用 Piper：下载中文 voice
-              后设置 <code>PIPER_MODEL</code>；没有模型时可先用 macOS <code>say</code>{" "}
-              离线合成。
-            </div>
-          </aside>
-        </section>
+        <LibraryPage
+          activeProject={activeProject}
+          health={health}
+          onSelectProject={(id) => selectProject(id)}
+          onDeleteProject={removeProject}
+          projects={projects}
+        />
       )}
     </main>
   );
 }
 
-function ProjectSummary({
+function ComposePage({
   activeProject,
   chapterCount,
+  content,
   draftDirty,
+  loading,
+  onCreate,
+  onDeleteProject,
+  onSelectProject,
+  onSetContent,
+  onSetProvider,
+  onSetTitle,
+  onSetVoice,
+  projects,
+  provider,
   segmentStats,
   stepCount,
+  title,
+  voice,
 }: {
   activeProject: GeneratedProject | null;
   chapterCount: number;
+  content: string;
   draftDirty: boolean;
+  loading: boolean;
+  onCreate: () => void;
+  onDeleteProject: (id: string) => void;
+  onSelectProject: (id: string) => void;
+  onSetContent: (value: string) => void;
+  onSetProvider: (value: Provider) => void;
+  onSetTitle: (value: string) => void;
+  onSetVoice: (value: string) => void;
+  projects: ProjectListItem[];
+  provider: Provider;
   segmentStats: string;
   stepCount: number;
+  title: string;
+  voice: string;
 }) {
   return (
-    <div className="studio-side-section">
-      <div className="studio-section-title compact">
-        <div>
-          <span className="studio-panel-kicker">Project</span>
-          <h2>当前项目</h2>
+    <section className="studio-page studio-page-grid">
+      <div className="studio-panel studio-compose">
+        <div className="studio-section-title">
+          <div>
+            <span className="studio-panel-kicker">Step 01</span>
+            <h2>输入与配置</h2>
+            <p>生成可编辑网页草稿，先看画面和节奏，再进入后续制作。</p>
+          </div>
+          <button className="studio-primary" disabled={loading} onClick={onCreate}>
+            {loading ? "提交中..." : "生成草稿"}
+          </button>
+        </div>
+
+        <label>
+          标题
+          <input value={title} onChange={(e) => onSetTitle(e.target.value)} />
+        </label>
+
+        <label>
+          内容 / 大纲 / 口播稿
+          <textarea value={content} onChange={(e) => onSetContent(e.target.value)} />
+        </label>
+
+        <div className="studio-grid">
+          <label>
+            TTS Provider
+            <select value={provider} onChange={(e) => onSetProvider(e.target.value as Provider)}>
+              <option value="edge-tts">edge-tts 本地命令</option>
+              <option value="say">macOS say 离线</option>
+              <option value="openai">OpenAI API</option>
+              <option value="piper">Piper 本地模型</option>
+            </select>
+          </label>
+          <label>
+            音色 / 模型音色
+            <input value={voice} onChange={(e) => onSetVoice(e.target.value)} />
+          </label>
         </div>
       </div>
-      <StatusBlock project={activeProject} segmentStats={segmentStats} />
-      <div className="studio-metrics">
-        <Metric label="章节" value={chapterCount || "-"} />
-        <Metric label="屏幕" value={stepCount || "-"} />
-        <Metric
-          label="状态"
-          value={activeProject ? statusText(activeProject.status) : "未选择"}
+
+      <aside className="studio-side">
+        <ProjectSummary
+          activeProject={activeProject}
+          chapterCount={chapterCount}
+          draftDirty={draftDirty}
+          segmentStats={segmentStats}
+          stepCount={stepCount}
         />
-      </div>
-      {draftDirty && <div className="studio-dirty-note">草稿有未保存修改</div>}
-    </div>
+        <ProjectLibrary
+          activeProject={activeProject}
+          onDelete={onDeleteProject}
+          projects={projects}
+          onSelect={onSelectProject}
+        />
+      </aside>
+    </section>
   );
 }
 
-function RuntimePanel({ health }: { health: Health | null }) {
-  return (
-    <div className="studio-side-section">
-      <div className="studio-section-title compact">
-        <div>
-          <span className="studio-panel-kicker">Runtime</span>
-          <h2>后端状态</h2>
-        </div>
-      </div>
-      <dl className="studio-runtime">
-        <div>
-          <dt>Provider</dt>
-          <dd>{health?.defaultProvider || "检测中"}</dd>
-        </div>
-        <div>
-          <dt>Voice</dt>
-          <dd>{health?.defaultVoice || "检测中"}</dd>
-        </div>
-        <div>
-          <dt>OpenAI Key</dt>
-          <dd>{health?.openaiConfigured ? "已配置" : "未配置"}</dd>
-        </div>
-        <div>
-          <dt>Renderer</dt>
-          <dd>{health?.chromeConfigured ? "Chrome Ready" : "未配置"}</dd>
-        </div>
-      </dl>
-    </div>
-  );
-}
-
-function ProjectLibrary({
+function EditPage({
   activeProject,
-  projects,
-  onSelect,
-  variant = "compact",
+  draftChapters,
+  draftDirty,
+  draftTitle,
+  isBusy,
+  loading,
+  onChangeChapters,
+  onPreviewStep,
+  onSave,
+  onSetPage,
+  onTitleChange,
+  previewFrameUrl,
+  previewGlobalStep,
+  previewUrl,
 }: {
   activeProject: GeneratedProject | null;
-  projects: ProjectListItem[];
-  onSelect: (id: string) => void;
-  variant?: "compact" | "large";
+  draftChapters: GeneratedProject["chapters"];
+  draftDirty: boolean;
+  draftTitle: string;
+  isBusy: boolean;
+  loading: boolean;
+  onChangeChapters: (chapters: GeneratedProject["chapters"]) => void;
+  onPreviewStep: (globalStep: number) => void;
+  onSave: () => void;
+  onSetPage: (page: StudioPage) => void;
+  onTitleChange: (value: string) => void;
+  previewFrameUrl: string;
+  previewGlobalStep: number;
+  previewUrl: string;
 }) {
   return (
-    <div
-      className={`studio-side-section studio-library ${
-        variant === "large" ? "is-large" : ""
-      }`}
-    >
-      <div className="studio-section-title compact">
-        <div>
-          <span className="studio-panel-kicker">Library</span>
-          <h2>历史项目</h2>
-        </div>
-      </div>
-      <div className="studio-list">
-        {projects.length === 0 && <p>暂无项目</p>}
-        {projects.map((project) => (
-          <button
-            className={project.id === activeProject?.id ? "is-active" : ""}
-            key={project.id}
-            onClick={() => onSelect(project.id)}
-          >
-            <strong>{project.title}</strong>
-            <span>
-              {statusText(project.status)} · {project.segmentCount} 屏
-              {project.hasVideo ? " · MP4" : project.hasAudio ? " · 音频" : ""}
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
+    <section className="studio-page studio-page-grid wide">
+      {!activeProject ? (
+        <EmptyState
+          title="还没有可编辑草稿"
+          body="先创建一个草稿，或从项目库选择历史项目。"
+          actionLabel="去创建草稿"
+          onAction={() => onSetPage("compose")}
+        />
+      ) : (
+        <>
+          <div className="studio-panel">
+            <DraftEditor
+              chapters={draftChapters}
+              dirty={draftDirty}
+              disabled={loading || isBusy}
+              onChange={onChangeChapters}
+              onPreviewStep={onPreviewStep}
+              onSave={onSave}
+              title={draftTitle}
+              onTitleChange={onTitleChange}
+            />
+          </div>
+
+          <aside className="studio-side">
+            <div className="studio-preview studio-side-section is-primary">
+              <div className="studio-preview-head">
+                <div>
+                  <span className="studio-panel-kicker">Live Preview</span>
+                  <h2>网页预览</h2>
+                </div>
+                <a href={previewUrl}>新窗口打开</a>
+              </div>
+              <iframe
+                key={`${activeProject.id}-${activeProject.updatedAt || ""}-${previewGlobalStep}`}
+                src={previewFrameUrl}
+                title="网页视频草稿预览"
+              />
+              <ChapterPreviewNav
+                chapters={draftChapters}
+                currentGlobalStep={previewGlobalStep}
+                onPreviewStep={onPreviewStep}
+              />
+            </div>
+          </aside>
+        </>
+      )}
+    </section>
   );
 }
 
-function EmptyState({
-  actionLabel,
-  body,
-  onAction,
-  title,
-}: {
-  actionLabel: string;
-  body: string;
-  onAction: () => void;
-  title: string;
-}) {
-  return (
-    <div className="studio-empty studio-panel">
-      <span className="studio-panel-kicker">No Project</span>
-      <h2>{title}</h2>
-      <p>{body}</p>
-      <button className="studio-primary" onClick={onAction}>
-        {actionLabel}
-      </button>
-    </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-function StatusBlock({
-  project,
+function ExportPage({
+  activeProject,
+  audioPreviewUrl,
+  autoPreviewUrl,
+  chapterCount,
+  draftDirty,
+  health,
+  isBusy,
+  loading,
+  onRender,
+  onSetPage,
+  onSynthesize,
+  previewUrl,
   segmentStats,
+  stepCount,
+  videoUrl,
 }: {
-  project: GeneratedProject | null;
+  activeProject: GeneratedProject | null;
+  audioPreviewUrl: string;
+  autoPreviewUrl: string;
+  chapterCount: number;
+  draftDirty: boolean;
+  health: Health | null;
+  isBusy: boolean;
+  loading: boolean;
+  onRender: () => void;
+  onSetPage: (page: StudioPage) => void;
+  onSynthesize: () => void;
+  previewUrl: string;
   segmentStats: string;
+  stepCount: number;
+  videoUrl: string;
 }) {
-  if (!project) {
-    return <div className="studio-status empty">还没有选中项目</div>;
-  }
-  const failedJob = Object.entries(project.jobs || {}).find(
-    ([, job]) => job.status === "failed",
-  );
   return (
-    <div className={`studio-status ${project.status}`}>
-      <strong>{statusText(project.status)}</strong>
-      <span>{segmentStats}</span>
-      <span>音频：{project.audio?.length ? `${project.audio.length} 段` : "未合成"}</span>
-      <span>视频：{project.video?.file ? "已导出 MP4" : "未导出"}</span>
-      {failedJob && <em>{failedJob[1].error || "任务失败"}</em>}
-    </div>
+    <section className="studio-page studio-page-grid">
+      {!activeProject ? (
+        <EmptyState
+          title="还没有选择项目"
+          body="选择一个草稿后，再合成音频或导出 MP4。"
+          actionLabel="打开项目库"
+          onAction={() => onSetPage("library")}
+        />
+      ) : (
+        <>
+          <div className="studio-panel">
+            <div className="studio-section-title">
+              <div>
+                <span className="studio-panel-kicker">Step 03</span>
+                <h2>合成与导出</h2>
+                <p>确认草稿保存后，再生成中文口播或导出最终 MP4。</p>
+              </div>
+            </div>
+            <StatusBlock project={activeProject} segmentStats={segmentStats} />
+            <div className="studio-metrics">
+              <Metric label="章节" value={chapterCount || "-"} />
+              <Metric label="屏幕" value={stepCount || "-"} />
+              <Metric label="状态" value={statusText(activeProject.status)} />
+            </div>
+            {draftDirty && (
+              <div className="studio-error">
+                当前草稿有未保存修改。请回到“编辑与预览”保存后再生成产物。
+              </div>
+            )}
+            <div className="studio-actions large">
+              <button
+                disabled={!activeProject || loading || isBusy || draftDirty}
+                onClick={onSynthesize}
+                type="button"
+              >
+                合成音频
+              </button>
+              <button
+                disabled={!activeProject || loading || isBusy || draftDirty}
+                onClick={onRender}
+                type="button"
+              >
+                导出 MP4
+              </button>
+            </div>
+            <div className="studio-links">
+              {previewUrl && <a href={previewUrl}>打开预览</a>}
+              {Boolean(activeProject.audio?.length) && (
+                <a href={audioPreviewUrl}>带音频预览</a>
+              )}
+              {autoPreviewUrl && <a href={autoPreviewUrl}>自动播放</a>}
+              {videoUrl && <a href={videoUrl}>下载 MP4</a>}
+            </div>
+          </div>
+
+          <aside className="studio-side">
+            <RuntimePanel health={health} />
+          </aside>
+        </>
+      )}
+    </section>
   );
 }
 
-function statusText(status = "ready") {
-  return STATUS_LABEL[status] || status;
+function LibraryPage({
+  activeProject,
+  health,
+  onDeleteProject,
+  onSelectProject,
+  projects,
+}: {
+  activeProject: GeneratedProject | null;
+  health: Health | null;
+  onDeleteProject: (id: string) => void;
+  onSelectProject: (id: string) => void;
+  projects: ProjectListItem[];
+}) {
+  return (
+    <section className="studio-page studio-page-grid">
+      <ProjectLibrary
+        activeProject={activeProject}
+        onDelete={onDeleteProject}
+        projects={projects}
+        variant="large"
+        onSelect={onSelectProject}
+      />
+      <aside className="studio-side">
+        <RuntimePanel health={health} />
+        <div className="studio-note">
+          API key 只放后端 <code>.env</code>。真本地模型可用 Piper：下载中文 voice
+          后设置 <code>PIPER_MODEL</code>；没有模型时可先用 macOS <code>say</code>{" "}
+          离线合成。
+        </div>
+      </aside>
+    </section>
+  );
 }
 
 function cloneDraft(project: GeneratedProject) {
@@ -645,214 +662,11 @@ function cloneDraft(project: GeneratedProject) {
   }));
 }
 
-function DraftEditor({
-  chapters,
-  dirty,
-  disabled,
-  onChange,
-  onPreviewStep,
-  onSave,
-  title,
-  onTitleChange,
-}: {
-  chapters: GeneratedProject["chapters"];
-  dirty: boolean;
-  disabled: boolean;
-  onChange: (chapters: GeneratedProject["chapters"]) => void;
-  onPreviewStep: (globalStep: number) => void;
-  onSave: () => void;
-  title: string;
-  onTitleChange: (title: string) => void;
-}) {
-  const chapterOffsets = getChapterOffsets(chapters);
-
-  const updateChapter = (
-    index: number,
-    patch: Partial<GeneratedProject["chapters"][number]>,
-  ) => {
-    onChange(
-      chapters.map((chapter, i) =>
-        i === index ? { ...chapter, ...patch } : chapter,
-      ),
-    );
-  };
-
-  const updateStep = (chapterIndex: number, stepIndex: number, text: string) => {
-    onChange(
-      chapters.map((chapter, i) => {
-        if (i !== chapterIndex) return chapter;
-        return {
-          ...chapter,
-          steps: chapter.steps.map((step, j) => (j === stepIndex ? text : step)),
-        };
-      }),
-    );
-  };
-
-  const addStep = (chapterIndex: number) => {
-    onChange(
-      chapters.map((chapter, i) =>
-        i === chapterIndex
-          ? { ...chapter, steps: [...chapter.steps, "新的画面口播"] }
-          : chapter,
-      ),
-    );
-  };
-
-  const removeStep = (chapterIndex: number, stepIndex: number) => {
-    onChange(
-      chapters
-        .map((chapter, i) => {
-          if (i !== chapterIndex) return chapter;
-          return {
-            ...chapter,
-            steps: chapter.steps.filter((_, j) => j !== stepIndex),
-          };
-        })
-        .filter((chapter) => chapter.steps.length > 0),
-    );
-  };
-
-  return (
-    <section className="studio-editor">
-      <div className="studio-editor-head">
-        <h2>调整草稿内容</h2>
-        {dirty && <span>有未保存修改</span>}
-        <button disabled={disabled} onClick={onSave}>
-          保存并刷新预览
-        </button>
-      </div>
-
-      <label>
-        项目标题
-        <input
-          disabled={disabled}
-          value={title}
-          onChange={(event) => onTitleChange(event.target.value)}
-        />
-      </label>
-
-      <div className="studio-chapters">
-        {chapters.map((chapter, chapterIndex) => (
-          <article className="studio-chapter-editor" key={chapter.id}>
-            <div className="studio-chapter-head">
-              <label>
-                章节标题
-                <input
-                  disabled={disabled}
-                  value={chapter.title}
-                  onChange={(event) =>
-                    updateChapter(chapterIndex, { title: event.target.value })
-                  }
-                />
-              </label>
-              <button
-                className="studio-secondary"
-                onClick={() => onPreviewStep(chapterOffsets[chapterIndex] || 0)}
-                type="button"
-              >
-                预览本章
-              </button>
-            </div>
-
-            {chapter.steps.map((step, stepIndex) => (
-              <label className="studio-step-editor" key={`${chapter.id}-${stepIndex}`}>
-                <span>第 {stepIndex + 1} 屏口播 / 主画面文字</span>
-                <textarea
-                  disabled={disabled}
-                  value={step}
-                  onChange={(event) =>
-                    updateStep(chapterIndex, stepIndex, event.target.value)
-                  }
-                />
-                <div className="studio-step-actions">
-                  <button
-                    onClick={() =>
-                      onPreviewStep((chapterOffsets[chapterIndex] || 0) + stepIndex)
-                    }
-                    type="button"
-                  >
-                    预览这一屏
-                  </button>
-                  <button
-                    disabled={disabled || chapter.steps.length <= 1}
-                    onClick={() => removeStep(chapterIndex, stepIndex)}
-                    type="button"
-                  >
-                    删除这一屏
-                  </button>
-                </div>
-              </label>
-            ))}
-
-            <button
-              className="studio-secondary"
-              disabled={disabled}
-              onClick={() => addStep(chapterIndex)}
-              type="button"
-            >
-              添加一屏
-            </button>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ChapterPreviewNav({
-  chapters,
-  currentGlobalStep,
-  onPreviewStep,
-}: {
-  chapters: GeneratedProject["chapters"];
-  currentGlobalStep: number;
-  onPreviewStep: (globalStep: number) => void;
-}) {
-  const offsets = getChapterOffsets(chapters);
-  return (
-    <div className="studio-preview-nav">
-      {chapters.map((chapter, chapterIndex) => (
-        <section key={chapter.id}>
-          <button
-            className={
-              currentGlobalStep >= offsets[chapterIndex] &&
-              currentGlobalStep < offsets[chapterIndex] + chapter.steps.length
-                ? "is-active"
-                : ""
-            }
-            onClick={() => onPreviewStep(offsets[chapterIndex] || 0)}
-            type="button"
-          >
-            {String(chapterIndex + 1).padStart(2, "0")} {chapter.title}
-          </button>
-          <div>
-            {chapter.steps.map((_, stepIndex) => {
-              const globalStep = (offsets[chapterIndex] || 0) + stepIndex;
-              return (
-                <button
-                  className={globalStep === currentGlobalStep ? "is-active" : ""}
-                  key={`${chapter.id}-${stepIndex}`}
-                  onClick={() => onPreviewStep(globalStep)}
-                  type="button"
-                >
-                  {stepIndex + 1}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ))}
-    </div>
-  );
-}
-
-function getChapterOffsets(chapters: GeneratedProject["chapters"]) {
-  const offsets: number[] = [];
-  let total = 0;
-  for (const chapter of chapters) {
-    offsets.push(total);
-    total += chapter.steps.length;
-  }
-  return offsets;
+function ensureDraftSaved(
+  draftDirty: boolean,
+  setError: (message: string) => void,
+) {
+  if (!draftDirty) return true;
+  setError("当前草稿有未保存修改。请先保存并刷新预览，再合成音频或导出 MP4。");
+  return false;
 }

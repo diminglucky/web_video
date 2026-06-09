@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { projectAudioDir } from "./config.js";
+import { badRequest, failedDependency } from "./errors.js";
 
 export async function synthesizeProjectAudio(project, options = {}) {
   const provider = options.provider || project.tts?.provider || "edge-tts";
@@ -77,7 +78,7 @@ export async function synthesizeOne({ provider, voice, text, out }) {
     const bin = process.env.PIPER_BIN || "piper";
     const model = process.env.PIPER_MODEL;
     if (!model) {
-      throw new Error("PIPER_MODEL is not set. Download a Piper voice model and set PIPER_MODEL=/path/to/model.onnx.");
+      throw failedDependency("PIPER_MODEL is not set. Download a Piper voice model and set PIPER_MODEL=/path/to/model.onnx.");
     }
     const wav = `${out}.wav`;
     await runWithInput(bin, ["--model", model, "--output_file", wav], text);
@@ -89,12 +90,12 @@ export async function synthesizeOne({ provider, voice, text, out }) {
     return;
   }
 
-  throw new Error(`Unsupported TTS provider: ${provider}`);
+  throw badRequest(`Unsupported TTS provider: ${provider}`);
 }
 
 async function openAiSpeech({ text, out, voice }) {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY is not set on the backend.");
+  if (!apiKey) throw failedDependency("OPENAI_API_KEY is not set on the backend.");
   const base = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
   const model = process.env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts";
   const selectedVoice = voice || "coral";
@@ -112,7 +113,7 @@ async function openAiSpeech({ text, out, voice }) {
     }),
   });
   if (!response.ok) {
-    throw new Error(`OpenAI TTS failed: ${response.status} ${await response.text()}`);
+    throw failedDependency(`OpenAI TTS failed: ${response.status} ${await response.text()}`);
   }
   const bytes = Buffer.from(await response.arrayBuffer());
   await fs.writeFile(out, bytes);
@@ -129,10 +130,12 @@ function runWithInput(cmd, args, input) {
     child.stderr.on("data", (chunk) => {
       stderr += chunk.toString();
     });
-    child.on("error", reject);
+    child.on("error", (error) => {
+      reject(failedDependency(`${cmd} could not be started: ${error.message}`));
+    });
     child.on("close", (code) => {
       if (code === 0) resolve();
-      else reject(new Error(`${cmd} exited ${code}: ${stderr.trim()}`));
+      else reject(failedDependency(`${cmd} exited ${code}: ${stderr.trim()}`));
     });
     if (input != null) child.stdin.write(input);
     child.stdin.end();

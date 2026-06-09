@@ -7,6 +7,7 @@ import {
   projectJsonPath,
   projectRenderDir,
 } from "./config.js";
+import { assertProjectId, conflict, notFound } from "./errors.js";
 
 export function newProjectId() {
   const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
@@ -14,6 +15,7 @@ export function newProjectId() {
 }
 
 export async function saveProject(project) {
+  assertProjectId(project.id);
   ensureStorage();
   await fs.mkdir(projectDir(project.id), { recursive: true });
   await fs.mkdir(projectAudioDir(project.id), { recursive: true });
@@ -23,14 +25,23 @@ export async function saveProject(project) {
 }
 
 export async function readProject(id) {
-  const raw = await fs.readFile(projectJsonPath(id), "utf8");
-  return JSON.parse(raw);
+  const projectId = assertProjectId(id);
+  try {
+    const raw = await fs.readFile(projectJsonPath(projectId), "utf8");
+    return JSON.parse(raw);
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      throw notFound(`Project not found: ${projectId}`);
+    }
+    throw error;
+  }
 }
 
 export async function updateProjectDraft(id, draft) {
-  const project = await readProject(id);
+  const projectId = assertProjectId(id);
+  const project = await readProject(projectId);
   if (project.status === "synthesizing" || project.status === "rendering") {
-    throw new Error("Project is busy. Wait for the current job to finish before editing.");
+    throw conflict("Project is busy. Wait for the current job to finish before editing.");
   }
 
   const chapters = normalizeChapters(draft.chapters);
@@ -47,9 +58,16 @@ export async function updateProjectDraft(id, draft) {
   delete project.audio;
   delete project.video;
 
-  await fs.rm(projectAudioDir(id), { recursive: true, force: true });
-  await fs.rm(projectRenderDir(id), { recursive: true, force: true });
+  await fs.rm(projectAudioDir(projectId), { recursive: true, force: true });
+  await fs.rm(projectRenderDir(projectId), { recursive: true, force: true });
   return saveProject(project);
+}
+
+export async function deleteProject(id) {
+  const projectId = assertProjectId(id);
+  await readProject(projectId);
+  await fs.rm(projectDir(projectId), { recursive: true, force: true });
+  return { id: projectId, deleted: true };
 }
 
 export async function listProjects() {
