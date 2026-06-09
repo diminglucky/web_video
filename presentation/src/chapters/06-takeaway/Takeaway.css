@@ -1,0 +1,179 @@
+.tk-scene {
+  color: var(--text);
+  overflow: hidden;
+}
+
+.tk-step-loop {
+  display: grid;
+  grid-template-columns: 0.7fr 1fr;
+  align-items: center;
+  gap: 86px;
+}
+
+.tk-definition,
+.tk-loop-node,
+.tk-question-card {
+  border: 2px solid var(--rule);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+}
+
+.tk-definition {
+  min-height: 430px;
+  padding: 48px;
+  display: grid;
+  align-content: center;
+  gap: 28px;
+  border-color: var(--accent);
+  box-shadow: 0 0 50px var(--accent-glow), inset 0 0 0 1px var(--rule);
+}
+
+.tk-definition span,
+.tk-loop-node span,
+.tk-big-line span,
+.tk-question-title span,
+.tk-question-card span {
+  color: var(--text-mute);
+  letter-spacing: 0;
+}
+
+.tk-definition strong {
+  font-size: 72px;
+  line-height: 1.1;
+}
+
+.tk-loop {
+  position: relative;
+  height: 650px;
+}
+
+.tk-loop-lines {
+  position: absolute;
+  inset: 15px 80px;
+  width: 820px;
+  height: 620px;
+}
+
+.tk-loop-lines path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-dasharray: 1700;
+  stroke-dashoffset: 1700;
+  animation: tk-draw 1300ms var(--ease-quart) both 380ms;
+}
+
+.tk-loop-node {
+  position: absolute;
+  z-index: 2;
+  width: 230px;
+  min-height: 128px;
+  padding: 24px;
+  display: grid;
+  align-content: center;
+  gap: 12px;
+  opacity: 0;
+  animation: tk-rise 560ms var(--ease-quart) both;
+  animation-delay: calc(220ms + var(--i) * 140ms);
+}
+
+.tk-loop-node strong {
+  font-size: 36px;
+}
+
+.tk-loop-0 { left: 365px; top: 20px; }
+.tk-loop-1 { right: 58px; top: 260px; border-color: var(--accent); }
+.tk-loop-2 { left: 365px; bottom: 20px; }
+.tk-loop-3 { left: 58px; top: 260px; }
+
+.tk-step-productivity {
+  justify-content: center;
+  gap: 64px;
+}
+
+.tk-big-line {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.tk-big-line h2 {
+  margin: 0;
+  font-family: var(--font-display-cn);
+  font-size: 104px;
+  line-height: 1.02;
+  letter-spacing: 0;
+}
+
+.tk-big-line .tk-accent {
+  color: var(--accent);
+}
+
+.tk-progress-rail {
+  height: 24px;
+  border: 2px solid var(--rule);
+  background: var(--surface-2);
+}
+
+.tk-progress-fill {
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  box-shadow: 0 0 34px var(--accent-glow);
+  animation: tk-fill 1500ms var(--ease-quart) both 420ms;
+}
+
+.tk-step-questions {
+  justify-content: center;
+  gap: 54px;
+}
+
+.tk-question-title {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.tk-question-title h2 {
+  margin: 0;
+  font-family: var(--font-display-cn);
+  font-size: 92px;
+  line-height: 1.08;
+  letter-spacing: 0;
+}
+
+.tk-question-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+
+.tk-question-card {
+  min-height: 250px;
+  padding: 34px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  opacity: 0;
+  transform: translateY(26px);
+  animation: tk-rise 600ms var(--ease-quart) both;
+  animation-delay: calc(180ms + var(--i) * 160ms);
+}
+
+.tk-question-card strong {
+  font-size: 44px;
+  line-height: 1.18;
+}
+
+@keyframes tk-rise {
+  from { opacity: 0; transform: translateY(26px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes tk-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes tk-fill {
+  to { width: 100%; }
+}

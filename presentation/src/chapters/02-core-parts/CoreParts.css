@@ -1,0 +1,232 @@
+.cp-scene {
+  color: var(--text);
+  overflow: hidden;
+}
+
+.cp-kicker {
+  color: var(--accent);
+  font-size: 17px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.cp-scene h2 {
+  margin: 0;
+  font-family: var(--font-display-cn);
+  font-size: 92px;
+  line-height: 1.08;
+  letter-spacing: 0;
+  max-width: 900px;
+}
+
+.cp-step-chain {
+  justify-content: center;
+  gap: 58px;
+}
+
+.cp-chain {
+  position: relative;
+  height: 330px;
+  display: grid;
+  grid-template-columns: 280px repeat(4, 1fr);
+  align-items: center;
+  gap: 28px;
+}
+
+.cp-chain-line {
+  position: absolute;
+  left: 78px;
+  right: 78px;
+  top: 74px;
+  width: calc(100% - 156px);
+  height: 180px;
+  pointer-events: none;
+}
+
+.cp-chain-line path,
+.cp-module-lines path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-dasharray: 1200;
+  stroke-dashoffset: 1200;
+  animation: cp-draw 1100ms var(--ease-quart) both 240ms;
+}
+
+.cp-goal-card,
+.cp-action-node,
+.cp-module-card,
+.cp-tool-card,
+.cp-planning-strip {
+  border: 2px solid var(--rule);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+}
+
+.cp-goal-card {
+  position: relative;
+  z-index: 2;
+  min-height: 160px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+  border-color: var(--accent);
+}
+
+.cp-goal-card span,
+.cp-action-node span,
+.cp-module-card span,
+.cp-tool-card span,
+.cp-planning-strip span {
+  color: var(--text-mute);
+  letter-spacing: 0;
+  font-size: 14px;
+}
+
+.cp-goal-card strong,
+.cp-action-node strong {
+  font-size: 30px;
+  line-height: 1.2;
+}
+
+.cp-action-node {
+  position: relative;
+  z-index: 2;
+  min-height: 136px;
+  padding: 24px 22px;
+  display: grid;
+  align-content: center;
+  gap: 14px;
+  opacity: 0;
+  transform: translateY(24px);
+  animation: cp-rise 560ms var(--ease-quart) both;
+  animation-delay: calc(480ms + var(--i) * 150ms);
+}
+
+.cp-step-modules {
+  display: grid;
+  place-items: center;
+}
+
+.cp-system-core {
+  position: relative;
+  z-index: 3;
+  width: 330px;
+  height: 220px;
+  border: 2px solid var(--accent);
+  background: var(--surface-2);
+  box-shadow: 0 0 54px var(--accent-glow), inset 0 0 0 2px var(--rule);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 20px;
+  animation: cp-core 720ms var(--ease-overshoot) both;
+}
+
+.cp-system-core span {
+  color: var(--text-mute);
+  letter-spacing: 0;
+}
+
+.cp-system-core strong {
+  font-family: var(--font-display-en);
+  font-size: 58px;
+  letter-spacing: 0;
+}
+
+.cp-module-lines {
+  position: absolute;
+  width: 1320px;
+  height: 620px;
+}
+
+.cp-module-card {
+  position: absolute;
+  width: 310px;
+  min-height: 150px;
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  opacity: 0;
+  animation: cp-rise 560ms var(--ease-quart) both;
+  animation-delay: calc(520ms + var(--i) * 130ms);
+}
+
+.cp-module-card strong {
+  font-size: 30px;
+}
+
+.cp-module-0 { left: 210px; top: 184px; }
+.cp-module-1 { right: 210px; top: 184px; }
+.cp-module-2 { left: 210px; bottom: 184px; }
+.cp-module-3 { right: 210px; bottom: 184px; }
+
+.cp-step-tools {
+  justify-content: center;
+  gap: 46px;
+}
+
+.cp-tools-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.cp-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 28px;
+}
+
+.cp-tool-card {
+  min-height: 190px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  opacity: 0;
+  transform: translateY(24px);
+  animation: cp-rise 560ms var(--ease-quart) both;
+  animation-delay: calc(180ms + var(--i) * 130ms);
+}
+
+.cp-tool-card strong {
+  color: var(--accent);
+  font-size: 42px;
+}
+
+.cp-planning-strip {
+  min-height: 118px;
+  padding: 26px 34px;
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  border-color: var(--accent);
+}
+
+.cp-planning-strip strong {
+  font-size: 32px;
+}
+
+.cp-strip-arrow {
+  color: var(--accent) !important;
+  font-size: 30px !important;
+}
+
+@keyframes cp-rise {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cp-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes cp-core {
+  from { opacity: 0; transform: scale(0.88); }
+  to { opacity: 1; transform: scale(1); }
+}

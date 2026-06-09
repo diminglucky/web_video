@@ -1,0 +1,192 @@
+.ul-scene {
+  color: var(--text);
+  overflow: hidden;
+}
+
+.ul-kicker {
+  color: var(--accent);
+  font-size: 17px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.ul-copy,
+.ul-risk-title {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.ul-copy h2,
+.ul-risk-title h2 {
+  margin: 0;
+  font-family: var(--font-display-cn);
+  font-size: 88px;
+  line-height: 1.08;
+  letter-spacing: 0;
+}
+
+.ul-step-use {
+  justify-content: center;
+  gap: 44px;
+}
+
+.ul-use-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 24px;
+}
+
+.ul-use-card,
+.ul-risk-card,
+.ul-boundary-card,
+.ul-boundary-panel {
+  border: 2px solid var(--rule);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+}
+
+.ul-use-card {
+  min-height: 180px;
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  opacity: 0;
+  animation: ul-rise 560ms var(--ease-quart) both;
+  animation-delay: calc(180ms + var(--i) * 110ms);
+}
+
+.ul-use-card span,
+.ul-risk-card span,
+.ul-boundary-card span,
+.ul-boundary-panel span,
+.ul-condition-row span {
+  color: var(--text-mute);
+  letter-spacing: 0;
+}
+
+.ul-use-card strong {
+  color: var(--accent);
+  font-size: 42px;
+}
+
+.ul-condition-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+
+.ul-condition-row span {
+  min-height: 76px;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--rule);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 24px;
+}
+
+.ul-step-risk {
+  justify-content: center;
+  gap: 54px;
+}
+
+.ul-risk-chain {
+  position: relative;
+  height: 300px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: center;
+  gap: 30px;
+}
+
+.ul-risk-line {
+  position: absolute;
+  inset: 20px 0;
+  width: 100%;
+  height: 260px;
+  pointer-events: none;
+}
+
+.ul-risk-line path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-dasharray: 1100;
+  stroke-dashoffset: 1100;
+  animation: ul-draw 1100ms var(--ease-quart) both 300ms;
+}
+
+.ul-risk-card {
+  position: relative;
+  z-index: 2;
+  min-height: 170px;
+  padding: 26px;
+  display: grid;
+  align-content: center;
+  gap: 20px;
+  opacity: 0;
+  animation: ul-rise 560ms var(--ease-quart) both;
+  animation-delay: calc(220ms + var(--i) * 160ms);
+}
+
+.ul-risk-card strong {
+  color: var(--text);
+  font-size: 39px;
+}
+
+.ul-step-boundary {
+  display: grid;
+  grid-template-columns: 0.72fr 1fr;
+  align-items: center;
+  gap: 76px;
+}
+
+.ul-boundary-panel {
+  min-height: 420px;
+  padding: 46px;
+  border-color: var(--accent);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 28px;
+  box-shadow: 0 0 50px var(--accent-glow), inset 0 0 0 1px var(--rule);
+}
+
+.ul-boundary-panel strong {
+  font-size: 70px;
+  line-height: 1.08;
+  text-align: center;
+}
+
+.ul-boundary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 26px;
+}
+
+.ul-boundary-card {
+  min-height: 190px;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  opacity: 0;
+  transform: translateY(26px);
+  animation: ul-rise 560ms var(--ease-quart) both;
+  animation-delay: calc(160ms + var(--i) * 130ms);
+}
+
+.ul-boundary-card strong {
+  font-size: 36px;
+}
+
+@keyframes ul-rise {
+  from { opacity: 0; transform: translateY(26px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ul-draw {
+  to { stroke-dashoffset: 0; }
+}

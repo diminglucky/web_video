@@ -1,0 +1,187 @@
+.nm-scene {
+  color: var(--text);
+  overflow: hidden;
+}
+
+.nm-step-compare {
+  display: grid;
+  grid-template-columns: 1fr 160px 1fr;
+  align-items: center;
+  gap: 42px;
+}
+
+.nm-compare-card {
+  min-height: 520px;
+  border: 2px solid var(--rule);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+  padding: 58px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 28px;
+  animation: nm-rise 620ms var(--ease-quart) both;
+}
+
+.nm-agent {
+  border-color: var(--accent);
+  animation-delay: 220ms;
+}
+
+.nm-compare-card span,
+.nm-stack-layer span,
+.nm-wired-node span,
+.nm-wired-caption {
+  color: var(--text-mute);
+  letter-spacing: 0;
+}
+
+.nm-compare-card strong {
+  color: var(--accent);
+  font-size: 118px;
+  line-height: 1;
+}
+
+.nm-compare-card p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 34px;
+  line-height: 1.4;
+}
+
+.nm-vs {
+  color: var(--accent);
+  font-size: 48px;
+  text-align: center;
+  animation: nm-pulse 1100ms var(--ease-quart) both 520ms;
+}
+
+.nm-step-stack {
+  display: grid;
+  grid-template-columns: 0.74fr 1fr;
+  align-items: center;
+  gap: 90px;
+}
+
+.nm-stack-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.nm-kicker {
+  color: var(--accent);
+  font-size: 17px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.nm-stack-copy h2 {
+  margin: 0;
+  font-family: var(--font-display-cn);
+  font-size: 94px;
+  line-height: 1.08;
+  letter-spacing: 0;
+}
+
+.nm-stack {
+  display: grid;
+  gap: 24px;
+}
+
+.nm-stack-layer {
+  min-height: 118px;
+  border: 2px solid var(--rule);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+  display: flex;
+  align-items: center;
+  padding: 0 42px;
+  opacity: 0;
+  transform: translateX(42px);
+  animation: nm-slide 560ms var(--ease-quart) both;
+  animation-delay: calc(180ms + var(--i) * 150ms);
+}
+
+.nm-stack-layer span {
+  color: var(--text);
+  font-size: 38px;
+}
+
+.nm-step-wired {
+  display: grid;
+  place-items: center;
+}
+
+.nm-wired-board {
+  position: relative;
+  width: 1260px;
+  height: 650px;
+  border: 2px dashed var(--rule);
+  background: var(--accent-soft);
+}
+
+.nm-wired-node {
+  position: absolute;
+  z-index: 2;
+  width: 300px;
+  min-height: 150px;
+  border: 2px solid var(--rule);
+  background: var(--surface-2);
+  display: grid;
+  align-content: center;
+  gap: 16px;
+  padding: 28px;
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+  animation: nm-rise 620ms var(--ease-quart) both;
+}
+
+.nm-wired-node strong {
+  font-size: 32px;
+}
+
+.nm-model { left: 72px; top: 250px; border-color: var(--accent); }
+.nm-goal { left: 480px; top: 72px; animation-delay: 140ms; }
+.nm-tools { right: 72px; top: 250px; animation-delay: 280ms; }
+
+.nm-wires {
+  position: absolute;
+  inset: 45px 70px;
+  width: 1120px;
+  height: 560px;
+}
+
+.nm-wires path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-dasharray: 940;
+  stroke-dashoffset: 940;
+  animation: nm-draw 1000ms var(--ease-quart) both 520ms;
+}
+
+.nm-wired-caption {
+  position: absolute;
+  right: 36px;
+  bottom: 28px;
+  color: var(--accent);
+  font-size: 18px;
+}
+
+@keyframes nm-rise {
+  from { opacity: 0; transform: translateY(26px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes nm-slide {
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes nm-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes nm-pulse {
+  from { opacity: 0; transform: scale(0.82); }
+  to { opacity: 1; transform: scale(1); }
+}

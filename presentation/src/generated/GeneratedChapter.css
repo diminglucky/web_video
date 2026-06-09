@@ -1,0 +1,131 @@
+.gen-scene {
+  color: var(--text);
+  overflow: hidden;
+}
+
+.gen-meta {
+  position: absolute;
+  top: 72px;
+  left: 96px;
+  color: var(--text-mute);
+  font-size: 15px;
+  letter-spacing: 0;
+}
+
+.gen-layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 0.82fr 1fr;
+  align-items: center;
+  gap: 84px;
+  padding-top: 64px;
+}
+
+.gen-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.gen-kicker {
+  color: var(--accent);
+  font-size: 17px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.gen-copy h2 {
+  margin: 0;
+  font-family: var(--font-display-cn);
+  font-size: 72px;
+  line-height: 1.14;
+  letter-spacing: 0;
+}
+
+.gen-board {
+  position: relative;
+  height: 650px;
+  border: 2px dashed var(--rule);
+  background: var(--accent-soft);
+}
+
+.gen-node,
+.gen-token {
+  border: 2px solid var(--rule);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+}
+
+.gen-node-main {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 50%;
+  width: 230px;
+  height: 170px;
+  transform: translate(-50%, -50%);
+  border-color: var(--accent);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+}
+
+.gen-node-main span,
+.gen-token span {
+  color: var(--text-mute);
+  letter-spacing: 0;
+}
+
+.gen-node-main strong {
+  color: var(--accent);
+  font-size: 68px;
+}
+
+.gen-lines {
+  position: absolute;
+  inset: 75px 45px;
+  width: 760px;
+  height: 500px;
+}
+
+.gen-lines path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-dasharray: 560;
+  stroke-dashoffset: 560;
+  animation: gen-draw 1100ms var(--ease-quart) both 220ms;
+}
+
+.gen-token {
+  position: absolute;
+  z-index: 3;
+  width: 190px;
+  min-height: 108px;
+  padding: 18px;
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  opacity: 0;
+  animation: gen-rise 560ms var(--ease-quart) both;
+}
+
+.gen-token strong {
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.gen-token-0 { left: 72px; top: 72px; animation-delay: 280ms; }
+.gen-token-1 { right: 72px; top: 92px; animation-delay: 420ms; }
+.gen-token-2 { left: 92px; bottom: 92px; animation-delay: 560ms; }
+.gen-token-3 { right: 72px; bottom: 72px; animation-delay: 700ms; }
+
+@keyframes gen-rise {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes gen-draw {
+  to { stroke-dashoffset: 0; }
+}

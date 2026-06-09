@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+presentation/node_modules/
+
+# Build output
+dist/
+dist-ssr/
+presentation/dist/
+presentation/dist-ssr/
+
+# Runtime/generated local data
+presentation/storage/
+.playwright-mcp/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Local env and editor files
+.env
+.env.*
+!.env.example
+*.local
+.DS_Store
+.vscode/
+.idea/

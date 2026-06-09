@@ -1,0 +1,447 @@
+.co-scene {
+  color: var(--text);
+  overflow: hidden;
+}
+
+.co-blueprint-id {
+  position: absolute;
+  left: 96px;
+  top: 72px;
+  font-size: 16px;
+  letter-spacing: 0;
+  color: var(--text-mute);
+}
+
+.co-kicker {
+  font-size: 17px;
+  letter-spacing: 0;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+.co-chat-layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 0.78fr 1fr;
+  gap: 92px;
+  align-items: center;
+  padding-top: 72px;
+}
+
+.co-chat-copy,
+.co-agent-copy,
+.co-travel-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.co-chat-copy h1,
+.co-agent-copy h2,
+.co-travel-copy h2 {
+  margin: 0;
+  font-family: var(--font-display-cn);
+  font-size: 92px;
+  line-height: 1.08;
+  letter-spacing: 0;
+  max-width: 760px;
+}
+
+.co-chat-copy p,
+.co-agent-copy p {
+  margin: 0;
+  max-width: 620px;
+  color: var(--text-2);
+  font-size: 32px;
+  line-height: 1.45;
+}
+
+.co-chat-board {
+  position: relative;
+  height: 640px;
+  border: 2px dashed var(--rule);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  animation: co-board-in 700ms var(--ease-quart) both;
+}
+
+.co-axis {
+  position: absolute;
+  background: var(--rule);
+}
+
+.co-axis-x {
+  left: 54px;
+  right: 54px;
+  top: 50%;
+  height: 2px;
+}
+
+.co-axis-y {
+  top: 54px;
+  bottom: 54px;
+  left: 50%;
+  width: 2px;
+}
+
+.co-chat-card,
+.co-request-card,
+.co-suggestion-card,
+.co-plan-output {
+  border: 2px solid var(--rule);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+}
+
+.co-chat-card {
+  position: absolute;
+  width: 320px;
+  min-height: 150px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.co-chat-card strong,
+.co-request-card strong,
+.co-suggestion-card strong,
+.co-plan-output strong {
+  font-size: 28px;
+  line-height: 1.25;
+}
+
+.co-card-label {
+  font-size: 13px;
+  letter-spacing: 0;
+  color: var(--text-mute);
+}
+
+.co-card-user {
+  left: 72px;
+  top: 86px;
+  animation: co-rise 650ms var(--ease-quart) both 120ms;
+}
+
+.co-card-answer {
+  right: 82px;
+  bottom: 126px;
+  animation: co-rise 650ms var(--ease-quart) both 440ms;
+}
+
+.co-chat-line {
+  position: absolute;
+  inset: 128px 64px auto 64px;
+  width: calc(100% - 128px);
+  height: 260px;
+  overflow: visible;
+}
+
+.co-chat-line path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-dasharray: 520;
+  stroke-dashoffset: 520;
+  animation: co-draw 950ms var(--ease-quart) both 760ms;
+}
+
+.co-chat-line circle {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 3;
+  opacity: 0;
+  animation: co-node-pop 420ms var(--ease-overshoot) both 980ms;
+}
+
+.co-one-shot {
+  position: absolute;
+  right: 34px;
+  top: 28px;
+  color: var(--accent);
+  font-size: 15px;
+  letter-spacing: 0;
+  opacity: 0;
+  animation: co-rise 550ms var(--ease-quart) both 1180ms;
+}
+
+.co-step-agent {
+  display: grid;
+  grid-template-columns: 1fr 0.72fr;
+  align-items: center;
+  gap: 74px;
+}
+
+.co-agent-system {
+  position: relative;
+  width: 820px;
+  height: 820px;
+  justify-self: center;
+}
+
+.co-target-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  width: 310px;
+  height: 310px;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--accent);
+  background: var(--surface-2);
+  box-shadow: 0 0 44px var(--accent-glow), inset 0 0 0 2px var(--rule);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 18px;
+  animation: co-core-in 820ms var(--ease-overshoot) both;
+}
+
+.co-target-ring span {
+  color: var(--text-mute);
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.co-target-ring strong {
+  font-family: var(--font-display-en);
+  font-size: 78px;
+  letter-spacing: 0;
+  color: var(--text);
+}
+
+.co-agent-orbits {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.co-orbit,
+.co-agent-path {
+  fill: none;
+  stroke: var(--rule);
+  stroke-width: 2;
+}
+
+.co-orbit-a {
+  stroke-dasharray: 12 16;
+  animation: co-spin 18s linear infinite;
+  transform-origin: center;
+}
+
+.co-orbit-b {
+  stroke-dasharray: 2 22;
+  animation: co-spin 28s linear infinite reverse;
+  transform-origin: center;
+}
+
+.co-agent-path {
+  stroke: var(--accent);
+  stroke-dasharray: 1160;
+  stroke-dashoffset: 1160;
+  animation: co-draw 1100ms var(--ease-quart) both 420ms;
+}
+
+.co-satellite {
+  position: absolute;
+  z-index: 4;
+  min-width: 150px;
+  padding: 18px 22px;
+  border: 2px solid var(--rule);
+  background: var(--surface-2);
+  color: var(--accent);
+  text-align: center;
+  font-size: 18px;
+  letter-spacing: 0;
+  opacity: 0;
+  animation: co-node-pop 520ms var(--ease-overshoot) both;
+}
+
+.co-sat-plan {
+  top: 92px;
+  left: 50%;
+  transform: translateX(-50%);
+  animation-delay: 620ms;
+}
+
+.co-sat-tool {
+  top: 50%;
+  right: 42px;
+  transform: translateY(-50%);
+  animation-delay: 760ms;
+}
+
+.co-sat-memory {
+  bottom: 92px;
+  left: 50%;
+  transform: translateX(-50%);
+  animation-delay: 900ms;
+}
+
+.co-sat-check {
+  top: 50%;
+  left: 42px;
+  transform: translateY(-50%);
+  animation-delay: 1040ms;
+}
+
+.co-agent-copy {
+  padding-right: 38px;
+}
+
+.co-agent-copy h2,
+.co-travel-copy h2 {
+  font-size: 86px;
+}
+
+.co-step-travel {
+  justify-content: center;
+  gap: 48px;
+}
+
+.co-travel-copy {
+  max-width: 1120px;
+}
+
+.co-request-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 34px;
+}
+
+.co-request-card,
+.co-suggestion-card,
+.co-plan-output {
+  min-height: 122px;
+  padding: 26px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.co-suggestion-card {
+  opacity: 0.62;
+}
+
+.co-task-chain {
+  position: relative;
+  height: 280px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: center;
+  gap: 26px;
+}
+
+.co-task-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.co-task-lines path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-dasharray: 1240;
+  stroke-dashoffset: 1240;
+  animation: co-draw 1200ms var(--ease-quart) both 320ms;
+}
+
+.co-task-lines .co-branch-line {
+  stroke: var(--rule);
+  stroke-width: 2;
+  animation-delay: 620ms;
+}
+
+.co-task-node {
+  position: relative;
+  z-index: 2;
+  min-height: 138px;
+  border: 2px solid var(--accent);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--accent-soft), 0 0 28px var(--accent-soft);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  opacity: 0;
+  transform: translateY(26px);
+  animation: co-rise 600ms var(--ease-quart) both;
+  animation-delay: calc(520ms + var(--i) * 140ms);
+}
+
+.co-node-index {
+  color: var(--text-mute);
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.co-task-node strong {
+  font-size: 36px;
+}
+
+.co-plan-output {
+  width: 590px;
+  align-self: flex-end;
+  border-color: var(--accent);
+  animation: co-rise 650ms var(--ease-quart) both 1220ms;
+}
+
+@keyframes co-board-in {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes co-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes co-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes co-node-pop {
+  from {
+    opacity: 0;
+    scale: 0.82;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes co-core-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes co-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
