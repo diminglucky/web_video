@@ -6,24 +6,38 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT_DIR = path.resolve(__dirname, "..");
 export const STORAGE_DIR = path.join(ROOT_DIR, "storage");
 export const PROJECTS_DIR = path.join(STORAGE_DIR, "projects");
+export const ENV_FILE = path.join(ROOT_DIR, ".env");
 
-loadEnvFile(path.join(ROOT_DIR, ".env"));
+loadEnvFile(ENV_FILE);
 
-export const SERVER_PORT = Number(process.env.WEB_VIDEO_SERVER_PORT || 8787);
-export const RENDER_BASE_URL =
+export let SERVER_PORT = Number(process.env.WEB_VIDEO_SERVER_PORT || 8787);
+export let RENDER_BASE_URL =
   process.env.WEB_VIDEO_RENDER_BASE_URL || "http://127.0.0.1:5174";
-export const RENDER_FPS = Number(process.env.WEB_VIDEO_RENDER_FPS || 30);
-export const RENDER_SETTLE_MS = Number(
+export let RENDER_FPS = Number(process.env.WEB_VIDEO_RENDER_FPS || 30);
+export let RENDER_SETTLE_MS = Number(
   process.env.WEB_VIDEO_RENDER_SETTLE_MS || 1400,
 );
-export const CHROME_EXECUTABLE_PATH =
+export let CHROME_EXECUTABLE_PATH =
   process.env.WEB_VIDEO_CHROME_PATH ||
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+  defaultChromeExecutablePath();
 
-export const DEFAULT_TTS_PROVIDER =
+export let DEFAULT_TTS_PROVIDER =
   process.env.WEB_VIDEO_TTS_PROVIDER || "edge-tts";
-export const DEFAULT_TTS_VOICE =
+export let DEFAULT_TTS_VOICE =
   process.env.WEB_VIDEO_TTS_VOICE || "zh-CN-YunxiNeural";
+
+export function refreshRuntimeConfig() {
+  SERVER_PORT = Number(process.env.WEB_VIDEO_SERVER_PORT || 8787);
+  RENDER_BASE_URL =
+    process.env.WEB_VIDEO_RENDER_BASE_URL || "http://127.0.0.1:5174";
+  RENDER_FPS = Number(process.env.WEB_VIDEO_RENDER_FPS || 30);
+  RENDER_SETTLE_MS = Number(process.env.WEB_VIDEO_RENDER_SETTLE_MS || 1400);
+  CHROME_EXECUTABLE_PATH =
+    process.env.WEB_VIDEO_CHROME_PATH ||
+    defaultChromeExecutablePath();
+  DEFAULT_TTS_PROVIDER = process.env.WEB_VIDEO_TTS_PROVIDER || "edge-tts";
+  DEFAULT_TTS_VOICE = process.env.WEB_VIDEO_TTS_VOICE || "zh-CN-YunxiNeural";
+}
 
 export function ensureStorage() {
   fs.mkdirSync(PROJECTS_DIR, { recursive: true });
@@ -61,6 +75,16 @@ function loadEnvFile(file) {
     if (process.env[key] != null && process.env[key] !== "") continue;
     process.env[key] = unquote(rawValue.trim());
   }
+}
+
+function defaultChromeExecutablePath() {
+  if (process.platform === "win32") {
+    return "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+  }
+  if (process.platform === "darwin") {
+    return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+  }
+  return "/usr/bin/google-chrome";
 }
 
 function unquote(value) {

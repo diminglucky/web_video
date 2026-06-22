@@ -1,10 +1,11 @@
 {
   "name": "presentation",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node tmp-start-vite.mjs",
+    "dev:vite": "vite",
     "server": "node server/server.js",
     "dev:server": "node server/server.js",
     "build": "tsc -b && vite build",

@@ -83,11 +83,12 @@ function GeneratedPresentation({
   }
 
   return (
-    <PresentationPlayer
-      chapters={runtime.chapters}
-      audioBasePath={runtime.audioBasePath}
-      githubUrl={null}
-      storageKey={`presentation-cursor-${projectId}`}
+      <PresentationPlayer
+        chapters={runtime.chapters}
+        audioByStep={runtime.audioByStep}
+        audioBasePath={runtime.audioBasePath}
+        githubUrl={null}
+        storageKey={`presentation-cursor-${projectId}`}
       renderGlobalStep={renderGlobalStep}
     />
   );
@@ -95,12 +96,14 @@ function GeneratedPresentation({
 
 function PresentationPlayer({
   chapters,
+  audioByStep,
   audioBasePath,
   githubUrl,
   storageKey,
   renderGlobalStep = null,
 }: {
   chapters: typeof CHAPTERS;
+  audioByStep?: Record<string, string>;
   audioBasePath: string;
   githubUrl?: string | null;
   storageKey?: string;
@@ -120,10 +123,13 @@ function PresentationPlayer({
   // Audio path follows the convention: /audio/<chapter-id>/<step+1>.mp3
   // (1-indexed file names match what `extract-narrations.ts` outputs.)
   // Empty narration → no audio src, Auto mode falls back to estimate.
+  const audioFile =
+    audioByStep?.[`${activeChapter.id}:${stepper.cursor.step + 1}`] ||
+    `${activeChapter.id}/${stepper.cursor.step + 1}.mp3`;
   const audioSrc =
     mode === "manual" || stepText === ""
       ? null
-      : `${import.meta.env.BASE_URL}${audioBasePath}/${activeChapter.id}/${stepper.cursor.step + 1}.mp3`;
+      : `${import.meta.env.BASE_URL}${audioBasePath}/${audioFile}`;
 
   const onAutoAdvance = useCallback(() => stepper.next(), [stepper]);
 

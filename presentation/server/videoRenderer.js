@@ -107,8 +107,8 @@ async function getSegmentDurations(project) {
   for (const segment of project.segments) {
     const audioPath = path.join(projectAudioRoot(project.id), segment.audio);
     const duration = fsSync.existsSync(audioPath)
-      ? await probeDurationMs(audioPath).catch(() => estimateMs(segment.text))
-      : estimateMs(segment.text);
+      ? await probeDurationMs(audioPath).catch(() => estimateMs(segment.narration || segment.text))
+      : estimateMs(segment.narration || segment.text);
     durations.push(Math.max(1200, duration + 250));
   }
   return durations;

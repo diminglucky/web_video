@@ -4,13 +4,63 @@ export interface GeneratedSegment {
   chapter: string;
   step: number;
   text: string;
+  narration?: string;
   audio: string;
+}
+
+export type GeneratedVisualKind =
+  | "chat"
+  | "agent-run"
+  | "loop"
+  | "capabilities"
+  | "tools"
+  | "memory"
+  | "risk"
+  | "default";
+
+export interface GeneratedVisualSpec {
+  kind?: GeneratedVisualKind | string;
+  action?: string;
+  subject?: string;
+  detail?: string;
+  labels?: string[];
+  storyboard?: GeneratedStoryboard;
+}
+
+export type GeneratedSceneType =
+  | "contrast"
+  | "workflow"
+  | "capability-loop"
+  | "tool-call"
+  | "memory"
+  | "risk-boundary"
+  | "scenario"
+  | "explain";
+
+export interface GeneratedStoryboard {
+  sceneType?: GeneratedSceneType | string;
+  claim?: string;
+  entities?: string[];
+  beforeState?: string;
+  actionSequence?: string[];
+  afterState?: string;
+  evidence?: string[];
+  visualMetaphor?: string;
 }
 
 export interface GeneratedChapter {
   id: string;
   title: string;
   steps: string[];
+  narrations?: string[];
+  visuals?: GeneratedVisualSpec[];
+}
+
+export interface GeneratedWorkflow {
+  scriptApproved?: boolean;
+  storyboardApproved?: boolean;
+  scriptApprovedAt?: string;
+  storyboardApprovedAt?: string;
 }
 
 export interface GeneratedProject {
@@ -23,6 +73,9 @@ export interface GeneratedProject {
   tts?: {
     provider?: string;
     voice?: string;
+    rate?: string;
+    volume?: string;
+    format?: string;
   };
   jobs?: Record<
     string,
@@ -48,6 +101,14 @@ export interface GeneratedProject {
     durationMs: number;
     renderedAt: string;
   };
+  generation?: {
+    provider?: string;
+    model?: string;
+    baseUrl?: string;
+    fallbackReason?: string;
+    generatedAt?: string;
+  };
+  workflow?: GeneratedWorkflow;
   chapters: GeneratedChapter[];
   segments: GeneratedSegment[];
 }
@@ -61,4 +122,5 @@ export interface RuntimeProject {
   title: string;
   chapters: ChapterDef[];
   audioBasePath: string;
+  audioByStep: Record<string, string>;
 }

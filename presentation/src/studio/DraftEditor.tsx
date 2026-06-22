@@ -36,10 +36,24 @@ export function DraftEditor({
     onChange(
       chapters.map((chapter, i) => {
         if (i !== chapterIndex) return chapter;
-        return {
-          ...chapter,
-          steps: chapter.steps.map((step, j) => (j === stepIndex ? text : step)),
-        };
+        return updateChapterStepText(chapter, stepIndex, text);
+      }),
+    );
+  };
+
+  const updateNarration = (
+    chapterIndex: number,
+    stepIndex: number,
+    text: string,
+  ) => {
+    onChange(
+      chapters.map((chapter, i) => {
+        if (i !== chapterIndex) return chapter;
+        const narrations = chapter.steps.map((step, index) => {
+          if (index === stepIndex) return text;
+          return chapter.narrations?.[index] || step;
+        });
+        return { ...chapter, narrations };
       }),
     );
   };
@@ -48,7 +62,14 @@ export function DraftEditor({
     onChange(
       chapters.map((chapter, i) =>
         i === chapterIndex
-          ? { ...chapter, steps: [...chapter.steps, "新的画面口播"] }
+          ? {
+              ...chapter,
+              steps: [...chapter.steps, "新的屏幕文案"],
+              narrations: [
+                ...(chapter.narrations || chapter.steps),
+                "新的屏幕文案",
+              ],
+            }
           : chapter,
       ),
     );
@@ -62,6 +83,9 @@ export function DraftEditor({
           return {
             ...chapter,
             steps: chapter.steps.filter((_, j) => j !== stepIndex),
+            narrations: (chapter.narrations || chapter.steps).filter(
+              (_, j) => j !== stepIndex,
+            ),
           };
         })
         .filter((chapter) => chapter.steps.length > 0),
@@ -112,7 +136,7 @@ export function DraftEditor({
 
             {chapter.steps.map((step, stepIndex) => (
               <label className="studio-step-editor" key={`${chapter.id}-${stepIndex}`}>
-                <span>第 {stepIndex + 1} 屏口播 / 主画面文字</span>
+                <span>第 {stepIndex + 1} 屏 · 屏幕文案</span>
                 <textarea
                   disabled={disabled}
                   value={step}
@@ -120,6 +144,20 @@ export function DraftEditor({
                     updateStep(chapterIndex, stepIndex, event.target.value)
                   }
                 />
+                <div className="studio-step-narration">
+                  <div className="studio-step-narration-head">
+                    <strong>真实口播</strong>
+                    <em>会用于合成音频</em>
+                  </div>
+                  <textarea
+                    disabled={disabled}
+                    value={chapter.narrations?.[stepIndex] || step}
+                    onChange={(event) =>
+                      updateNarration(chapterIndex, stepIndex, event.target.value)
+                    }
+                  />
+                  <small>修改后先保存草稿；如果已经生成过音频，需要重新合成才会听到新口播。</small>
+                </div>
                 <div className="studio-step-actions">
                   <button
                     onClick={() =>
@@ -210,4 +248,21 @@ function getChapterOffsets(chapters: GeneratedProject["chapters"]) {
     total += chapter.steps.length;
   }
   return offsets;
+}
+
+function updateChapterStepText(
+  chapter: GeneratedProject["chapters"][number],
+  stepIndex: number,
+  text: string,
+) {
+  const previousStep = chapter.steps[stepIndex] || "";
+  const steps = chapter.steps.map((step, index) =>
+    index === stepIndex ? text : step,
+  );
+  const narrations = steps.map((step, index) => {
+    const existing = chapter.narrations?.[index];
+    if (index !== stepIndex) return existing || chapter.steps[index] || step;
+    return !existing || existing === previousStep ? text : existing;
+  });
+  return { ...chapter, steps, narrations };
 }

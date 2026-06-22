@@ -17,6 +17,9 @@ export async function startSynthesisJob(projectId, options = {}) {
     tts: {
       provider: options.provider || undefined,
       voice: options.voice || undefined,
+      rate: options.rate || undefined,
+      volume: options.volume || undefined,
+      format: options.format || undefined,
     },
   });
 
@@ -32,9 +35,13 @@ export async function startSynthesisJob(projectId, options = {}) {
       const audio = await synthesizeProjectAudio(current, {
         provider: current.tts?.provider,
         voice: current.tts?.voice,
+        rate: current.tts?.rate,
+        volume: current.tts?.volume,
+        format: current.tts?.format,
         force: Boolean(options.force),
       });
       const latest = await readProject(projectId);
+      latest.segments = syncSegmentAudio(latest.segments, audio);
       latest.audio = audio.map(({ chapter, step, audio: file, status }) => ({
         chapter,
         step,
@@ -61,7 +68,15 @@ export async function startRenderJob(projectId, options = {}) {
   const key = jobKey(projectId, "render");
   if (running.has(key)) return readProject(projectId);
 
-  const project = await markJobStarted(projectId, "render", "rendering");
+  const project = await markJobStarted(projectId, "render", "rendering", {
+    tts: {
+      provider: options.provider || undefined,
+      voice: options.voice || undefined,
+      rate: options.rate || undefined,
+      volume: options.volume || undefined,
+      format: options.format || undefined,
+    },
+  });
 
   running.set(
     key,
@@ -91,9 +106,13 @@ export async function startRenderJob(projectId, options = {}) {
         const audio = await synthesizeProjectAudio(current, {
           provider: current.tts?.provider,
           voice: current.tts?.voice,
+          rate: current.tts?.rate,
+          volume: current.tts?.volume,
+          format: current.tts?.format,
           force: Boolean(options.forceAudio),
         });
         current = await readProject(projectId);
+        current.segments = syncSegmentAudio(current.segments, audio);
         current.audio = audio.map(({ chapter, step, audio: file, status }) => ({
           chapter,
           step,
@@ -156,6 +175,9 @@ async function markJobStarted(projectId, kind, status, patch = {}) {
       provider:
         patch.tts.provider || project.tts?.provider || DEFAULT_TTS_PROVIDER,
       voice: patch.tts.voice || project.tts?.voice || DEFAULT_TTS_VOICE,
+      rate: patch.tts.rate || project.tts?.rate || process.env.WEB_VIDEO_TTS_RATE || "0",
+      volume: patch.tts.volume || project.tts?.volume || process.env.WEB_VIDEO_TTS_VOLUME || "100",
+      format: patch.tts.format || project.tts?.format || process.env.WEB_VIDEO_TTS_FORMAT || "mp3",
     };
   }
   project.jobs = {
@@ -256,4 +278,14 @@ function progress(current, total) {
 
 function pickStartedAt(job) {
   return job?.startedAt ? { startedAt: job.startedAt } : {};
+}
+
+function syncSegmentAudio(segments = [], audio = []) {
+  const byKey = new Map(
+    audio.map((item) => [`${item.chapter}:${item.step}`, item.audio]),
+  );
+  return segments.map((segment) => ({
+    ...segment,
+    audio: byKey.get(`${segment.chapter}:${segment.step}`) || segment.audio,
+  }));
 }
