@@ -10,14 +10,14 @@ import type {
   TtsTestResult,
 } from "./types";
 
-const API_BASE_URL = "http://127.0.0.1:8787";
+const API_BASE_URL = import.meta.env.VITE_WEB_VIDEO_API_BASE_URL || "";
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   let res: Response;
   try {
     res = await fetch(toApiUrl(path), options);
   } catch (error) {
-    throw new Error(formatNetworkError(error));
+    throw new Error(formatNetworkError(error), { cause: error });
   }
   const data = await res.json().catch(() => null);
   if (!res.ok) {
@@ -37,7 +37,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 function formatNetworkError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  return `无法连接后端服务 ${API_BASE_URL}。请确认 start-local.bat 已启动，或刷新页面后重试。原始错误：${message}`;
+  const target = API_BASE_URL || "当前页面同源 /api";
+  return `无法连接后端服务 ${target}。请确认前后端已启动，或刷新页面后重试。原始错误：${message}`;
 }
 
 function toApiUrl(path: string) {
