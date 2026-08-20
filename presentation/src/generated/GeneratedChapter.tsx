@@ -80,24 +80,15 @@ export function GeneratedChapterView({
         <span>{progress}</span>
       </div>
 
-      <div className="gen-layout" key={`${chapter.id}-${step}`}>
+      <div className="gen-canvas-shell" key={`${chapter.id}-${step}`}>
         <main className={`gen-hero ${density}`}>
           <div className="gen-kicker mono">
             Chapter {String(index + 1).padStart(2, "0")} / {chapter.title}
           </div>
-          <span className="gen-section-label">这一屏要讲清楚</span>
           <h2>{screenText}</h2>
-          <p>{teaching.explanation}</p>
-          <div className="gen-context-row">
-            <span>{sceneName(visual.storyboard.sceneType)}</span>
-            <span>{visual.subject}</span>
-          </div>
         </main>
 
-        <aside className="gen-visual-stack">
-          <SceneIllustration teaching={teaching} visual={visual} />
-          <TeachingBoard teaching={teaching} visual={visual} />
-        </aside>
+        <SceneIllustration teaching={teaching} visual={visual} />
       </div>
     </section>
   );
@@ -110,130 +101,148 @@ function SceneIllustration({
   teaching: TeachingContent;
   visual: NormalizedVisual;
 }) {
-  if (visual.storyboard.sceneType === "contrast" || visual.kind === "chat") {
+  if (visual.storyboard.sceneType === "contrast") {
     return (
-      <div className="gen-illustration gen-chat-illustration">
-        <div className="gen-chat-panel is-bot">
-          <span>聊天机器人</span>
-          <p>{visual.storyboard.beforeState}</p>
-          <strong>给出一段回答</strong>
+      <div className="gen-visual gen-visual-contrast" aria-label={visual.detail}>
+        <div className="gen-visual-axis gen-visual-axis-x" />
+        <div className="gen-visual-axis gen-visual-axis-y" />
+        <div className="gen-question-node">
+          <span className="mono">INPUT</span>
+          <div className="gen-question-mark" aria-hidden="true">?</div>
+          <strong>目标</strong>
         </div>
-        <div className="gen-chat-panel is-agent">
-          <span>Agent</span>
-          <p>{visual.storyboard.afterState}</p>
-          <strong>继续推进任务</strong>
+        <div className="gen-contrast-lane is-bot">
+          <span className="mono">CHATBOT</span>
+          <div className="gen-chat-bubbles" aria-hidden="true"><i /><i /><i /></div>
+          <strong>回复</strong>
         </div>
+        <div className="gen-contrast-lane is-agent">
+          <span className="mono">AGENT</span>
+          <div className="gen-task-bars" aria-hidden="true"><i /><i /><i /></div>
+          <strong>行动</strong>
+        </div>
+        <svg className="gen-contrast-line" viewBox="0 0 860 420" aria-hidden="true">
+          <path d="M 132 138 C 280 138, 350 245, 498 245" />
+          <path d="M 132 138 C 314 82, 558 82, 728 164" />
+          <circle cx="132" cy="138" r="10" />
+          <circle cx="498" cy="245" r="10" />
+          <circle cx="728" cy="164" r="10" />
+        </svg>
       </div>
     );
   }
 
-  if (visual.storyboard.sceneType === "capability-loop" || visual.kind === "capabilities") {
+  if (visual.storyboard.sceneType === "capability-loop") {
     return (
-      <div className="gen-illustration gen-loop-illustration">
+      <div className="gen-visual gen-visual-loop" aria-label={visual.detail}>
+        <svg className="gen-loop-path" viewBox="0 0 760 520" aria-hidden="true">
+          <circle cx="380" cy="260" r="182" />
+          <path d="M 380 78 L 480 128 L 532 260 L 480 392 L 380 442" />
+        </svg>
+        <div className="gen-loop-core">
+          <span className="mono">SYSTEM</span>
+          <strong>AGENT</strong>
+        </div>
         {visual.storyboard.actionSequence.slice(0, 4).map((item, index) => (
-          <div className="gen-loop-node" key={`${item}-${index}`}>
+          <div className={`gen-loop-node gen-loop-node-${index}`} key={`${item}-${index}`}>
             <span>{String(index + 1).padStart(2, "0")}</span>
-            <strong>{item}</strong>
+            <strong>{shortLabel(item, ["目标", "计划", "工具", "复核"][index])}</strong>
           </div>
         ))}
       </div>
     );
   }
 
-  if (visual.storyboard.sceneType === "tool-call" || visual.kind === "tools") {
+  if (visual.storyboard.sceneType === "tool-call") {
     return (
-      <div className="gen-illustration gen-tools-illustration">
+      <div className="gen-visual gen-visual-chain" aria-label={visual.detail}>
+        <div className="gen-chain-input">
+          <span className="mono">PLAN</span>
+          <div className="gen-tool-glyph is-plan" aria-hidden="true" />
+          <strong>任务</strong>
+        </div>
+        <svg className="gen-chain-line" viewBox="0 0 900 150" aria-hidden="true">
+          <path d="M 50 75 H 850" />
+        </svg>
+        <div className="gen-chain-steps">
         {visual.storyboard.actionSequence.slice(0, 3).map((item, index) => (
-          <div className="gen-tool-card" key={`${item}-${index}`}>
+          <div className="gen-chain-step" key={`${item}-${index}`}>
             <span className="mono">CALL {index + 1}</span>
-            <strong>{item}</strong>
-            <p>{visual.storyboard.evidence[index] || teaching.points[index]?.detail}</p>
+            <div className={`gen-tool-glyph is-tool-${index}`} aria-hidden="true" />
+            <strong>{shortLabel(item, ["拆分", "调用", "汇总"][index])}</strong>
           </div>
         ))}
+        </div>
+        <div className="gen-chain-output">
+          <span className="mono">OUTPUT</span>
+          <div className="gen-result-mark" aria-hidden="true">✓</div>
+          <strong>结果</strong>
+        </div>
       </div>
     );
   }
 
-  if (visual.storyboard.sceneType === "memory" || visual.kind === "memory") {
+  if (visual.storyboard.sceneType === "memory") {
     return (
-      <div className="gen-illustration gen-memory-illustration">
+      <div className="gen-visual gen-visual-ledger" aria-label={visual.detail}>
+        <div className="gen-ledger-head">
+          <span className="mono">PROGRESS MEMORY</span>
+          <div className="gen-memory-orbit" aria-hidden="true"><i /><i /><i /></div>
+          <strong>持续进度</strong>
+        </div>
         {visual.storyboard.entities.slice(0, 3).map((item, index) => (
-          <div className="gen-memory-row" key={`${item}-${index}`}>
+          <div className={`gen-ledger-row gen-ledger-row-${index}`} key={`${item}-${index}`}>
             <span />
-            <strong>{item}</strong>
-            <p>{visual.storyboard.evidence[index] || visual.storyboard.actionSequence[index]}</p>
+            <strong>{shortLabel(item, ["已完成", "进行中", "下一步"][index])}</strong>
+            <div className="gen-ledger-bar" aria-hidden="true"><i /></div>
           </div>
         ))}
       </div>
     );
   }
 
-  if (visual.storyboard.sceneType === "risk-boundary" || visual.kind === "risk") {
+  if (visual.storyboard.sceneType === "risk-boundary") {
     return (
-      <div className="gen-illustration gen-risk-illustration">
-        <div>
-          <span>系统准备行动</span>
-          <strong>{visual.storyboard.beforeState}</strong>
+      <div className="gen-visual gen-visual-gate" aria-label={visual.detail}>
+        <div className="gen-gate-side is-system">
+          <span className="mono">AGENT</span>
+          <div className="gen-gate-icon is-action" aria-hidden="true"><i /></div>
+          <strong>执行</strong>
         </div>
-        <b>需要确认</b>
-        <div>
-          <span>人做决定</span>
-          <strong>{visual.storyboard.afterState}</strong>
+        <div className="gen-gate-center">
+          <span className="mono">PAUSE</span>
+          <b>需要确认</b>
+        </div>
+        <div className="gen-gate-side is-human">
+          <span className="mono">HUMAN</span>
+          <div className="gen-gate-icon is-decision" aria-hidden="true"><i /></div>
+          <strong>决策</strong>
         </div>
       </div>
     );
   }
 
+  // Workflow, scenario, and explain scenes share the input-to-result composition.
   return (
-    <div className="gen-illustration gen-workflow-illustration">
+    <div className="gen-visual gen-visual-scenario" aria-label={visual.detail}>
+      <div className="gen-scenario-input">
+        <span className="mono">INPUT</span>
+        <div className="gen-scenario-symbol is-input" aria-hidden="true" />
+        <strong>输入</strong>
+      </div>
       {teaching.points.map((point, index) => (
-        <div key={`${point.title}-${index}`}>
+        <div className="gen-scenario-step" key={`${point.title}-${index}`}>
           <span>{String(index + 1).padStart(2, "0")}</span>
-          <strong>{point.title}</strong>
+          <div className={`gen-scenario-symbol is-step-${index}`} aria-hidden="true" />
+          <strong>{shortLabel(point.title, ["识别", "处理", "交付"][index])}</strong>
         </div>
       ))}
+      <div className="gen-scenario-output">
+        <span className="mono">RESULT</span>
+        <div className="gen-scenario-symbol is-result" aria-hidden="true" />
+        <strong>交付</strong>
+      </div>
     </div>
-  );
-}
-
-function TeachingBoard({
-  teaching,
-  visual,
-}: {
-  teaching: TeachingContent;
-  visual: NormalizedVisual;
-}) {
-  return (
-    <aside className="gen-board" aria-label={visual.detail}>
-      <div className="gen-board-head">
-        <span className="mono">WHY THIS MATTERS</span>
-        <strong>{teaching.claim}</strong>
-      </div>
-
-      <div className="gen-proof-list">
-        {teaching.points.map((point, index) => (
-          <article className="gen-proof" key={`${point.title}-${index}`}>
-            <span className="mono">{String(index + 1).padStart(2, "0")}</span>
-            <div>
-              <strong>{point.title}</strong>
-              <p>{point.detail}</p>
-            </div>
-          </article>
-        ))}
-      </div>
-
-      {teaching.example && (
-        <div className="gen-example">
-          <span className="mono">EXAMPLE</span>
-          <p>{teaching.example}</p>
-        </div>
-      )}
-
-      <div className="gen-takeaway">
-        <span className="mono">TAKEAWAY</span>
-        <strong>{teaching.takeaway}</strong>
-      </div>
-    </aside>
   );
 }
 
@@ -572,19 +581,6 @@ function splitKeywords(text: string) {
     .slice(0, 5);
 }
 
-function sceneName(sceneType: GeneratedSceneType) {
-  return {
-    contrast: "对比",
-    workflow: "流程",
-    "capability-loop": "闭环",
-    "tool-call": "工具",
-    memory: "进度",
-    "risk-boundary": "边界",
-    scenario: "例子",
-    explain: "解释",
-  }[sceneType];
-}
-
 function isSameIdea(sentence: string, screenText: string) {
   const compactSentence = sentence.replace(/\W+/gu, "");
   const compactScreen = screenText.replace(/\W+/gu, "");
@@ -602,4 +598,9 @@ function cleanArray(value: unknown) {
 
 function clean(value: unknown) {
   return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function shortLabel(value: unknown, fallback: string) {
+  const label = clean(value);
+  return label.length > 8 ? fallback : label || fallback;
 }
