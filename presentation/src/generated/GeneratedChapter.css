@@ -2935,3 +2935,237 @@
   .gen-feedback-node { width: 84px; padding: 8px 10px; }
   .gen-feedback-node strong { font-size: 12px; }
 }
+
+/* The stage is viewed from a distance in the final video. Keep the visual
+   hierarchy strong enough after the 16:9 fitter scales the raw canvas. */
+@media (min-width: 901px) {
+  .gen-topline {
+    padding-bottom: 24px;
+    font-size: 14px;
+  }
+
+  .gen-canvas-shell {
+    padding-top: 28px;
+  }
+
+  .gen-hero {
+    gap: 34px;
+    padding-bottom: 28px;
+  }
+
+  .gen-hero .gen-kicker {
+    max-width: 210px;
+    padding-top: 8px;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .gen-hero h2,
+  .gen-hero.is-medium h2 {
+    max-width: 1080px;
+    font-size: 68px;
+    line-height: 1.08;
+  }
+
+  .gen-hero.is-long h2 {
+    max-width: 1080px;
+    font-size: 58px;
+    line-height: 1.12;
+  }
+
+  .gen-title-wrap { gap: 14px; }
+
+  .gen-case-line {
+    gap: 12px;
+    min-height: 24px;
+    font-size: 14px;
+  }
+
+  .gen-case-line > span:first-child {
+    font-size: 11px;
+  }
+
+  .gen-case-line strong {
+    font-size: 15px;
+  }
+
+  .gen-case-change {
+    padding-left: 12px;
+  }
+
+  .gen-evidence-note {
+    right: 0;
+    bottom: 24px;
+    max-width: 54%;
+    gap: 12px;
+    padding-top: 10px;
+  }
+
+  .gen-evidence-note span { font-size: 11px; }
+  .gen-evidence-note strong { font-size: 14px; }
+  .gen-evidence-glyph { width: 36px; height: 36px; }
+
+  .gen-visual-ledger {
+    gap: 28px;
+    padding: 78px 120px;
+  }
+
+  .gen-ledger-head {
+    gap: 14px;
+    padding-bottom: 24px;
+  }
+
+  .gen-ledger-head > span { font-size: 13px; }
+  .gen-ledger-head strong { font-size: 46px; }
+
+  .gen-ledger-row {
+    grid-template-columns: 28px 300px minmax(0, 1fr);
+    gap: 24px;
+    min-height: 108px;
+    padding: 18px 24px;
+  }
+
+  .gen-ledger-row > span {
+    width: 20px;
+    height: 20px;
+    box-shadow: 0 0 0 11px rgba(15, 123, 104, 0.1);
+  }
+
+  .gen-ledger-row strong { font-size: 28px; }
+
+  .gen-timeline-map {
+    width: min(1120px, 88%);
+    padding-top: 50px;
+  }
+
+  .gen-timeline-item {
+    gap: 16px;
+    min-height: 110px;
+    padding: 0 24px;
+  }
+
+  .gen-timeline-item i {
+    top: -56px;
+    left: -7px;
+    width: 13px;
+    height: 13px;
+    border-width: 3px;
+  }
+
+  .gen-timeline-item span { font-size: 13px; }
+  .gen-timeline-item strong { font-size: 26px; }
+
+  .gen-artifact-heading {
+    top: 32px;
+    left: 42px;
+    gap: 8px;
+    max-width: 58%;
+  }
+
+  .gen-artifact-heading span { font-size: 11px; }
+  .gen-artifact-heading strong { font-size: 19px; }
+
+  .gen-document-sheet {
+    gap: 20px;
+    padding: 48px 64px 52px;
+  }
+
+  .gen-document-title { font-size: clamp(30px, 3vw, 52px); }
+  .gen-document-rule { height: 8px; }
+  .gen-document-highlight { padding: 13px 18px; font-size: 18px; }
+
+  .gen-table-row {
+    min-height: 78px;
+  }
+
+  .gen-table-row > * {
+    padding: 20px 24px;
+    font-size: 18px;
+  }
+
+  .gen-table-row.is-head > * { font-size: 13px; }
+
+  .gen-visual-task-run,
+  .gen-visual-feedback {
+    padding: 72px 110px 54px;
+  }
+
+  .gen-task-run-goal,
+  .gen-task-run-result {
+    max-width: 320px;
+    padding: 18px 22px;
+  }
+
+  .gen-task-run-goal span,
+  .gen-task-run-result span { font-size: 12px; }
+  .gen-task-run-goal strong,
+  .gen-task-run-result strong { font-size: 24px; }
+
+  .gen-task-run-step i {
+    width: 20px;
+    height: 20px;
+  }
+
+  .gen-task-run-step span { font-size: 12px; }
+  .gen-task-run-step strong { max-width: 170px; font-size: 22px; }
+
+  .gen-feedback-ring { width: min(460px, 56%); }
+  .gen-feedback-core { width: 230px; }
+  .gen-feedback-core span { font-size: 12px; }
+  .gen-feedback-core strong { font-size: 28px; }
+  .gen-feedback-node { width: 170px; padding: 18px 20px; }
+  .gen-feedback-node span { font-size: 12px; }
+  .gen-feedback-node strong { font-size: 21px; }
+
+  .gen-gate-side {
+    min-height: 220px;
+    padding: 28px 32px;
+  }
+
+  .gen-gate-side > span,
+  .gen-gate-center > span { font-size: 13px; }
+  .gen-gate-side strong { font-size: 30px; }
+  .gen-gate-center { min-width: 190px; min-height: 190px; }
+  .gen-gate-center b { font-size: 25px; }
+
+  .gen-scenario-travel,
+  .gen-scenario-office,
+  .gen-scenario-support,
+  .gen-scenario-development {
+    gap: 30px;
+    padding: 72px 56px;
+  }
+
+  .gen-travel-route,
+  .gen-travel-constraint,
+  .gen-office-source,
+  .gen-office-result {
+    min-height: 260px;
+    padding: 28px;
+  }
+
+  .gen-travel-route > span,
+  .gen-travel-constraint > span { font-size: 12px; }
+  .gen-travel-route strong { font-size: 46px; }
+  .gen-travel-constraint strong { font-size: 32px; }
+  .gen-travel-route small,
+  .gen-travel-constraint small { font-size: 16px; }
+
+  .gen-office-source strong,
+  .gen-office-result strong,
+  .gen-office-desk strong,
+  .gen-support-queue strong,
+  .gen-support-router strong,
+  .gen-support-lane strong,
+  .gen-dev-request strong,
+  .gen-dev-code strong,
+  .gen-dev-test strong { font-size: 26px; }
+}
+
+@media (max-width: 900px) {
+  .gen-hero h2 { font-size: 42px; }
+  .gen-hero.is-medium h2 { font-size: 39px; }
+  .gen-hero.is-long h2 { font-size: 35px; }
+  .gen-timeline-map { width: 100%; }
+  .gen-timeline-item strong { font-size: 19px; }
+}

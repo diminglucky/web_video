@@ -5,6 +5,7 @@ import { attachVisualPlans, normalizeVisualSpec } from "./visualPlanner.js";
 
 const DEFAULT_MODEL = "gpt-4o-mini";
 const DEFAULT_BASE_URL = "https://api.openai.com/v1";
+const DEFAULT_LLM_MAX_TOKENS = 2800;
 const MAX_LLM_CHAPTERS = 7;
 const MAX_LLM_STEPS_PER_CHAPTER = 5;
 
@@ -42,14 +43,30 @@ export async function buildProjectWithLlm({ title, content }) {
   const model = process.env.WEB_VIDEO_LLM_MODEL || DEFAULT_MODEL;
   const baseUrl = normalizeBaseUrl(process.env.OPENAI_BASE_URL || DEFAULT_BASE_URL);
   const timeoutMs = Number(process.env.WEB_VIDEO_LLM_TIMEOUT_MS || 45000);
+  const maxTokens = normalizeMaxTokens(process.env.WEB_VIDEO_LLM_MAX_TOKENS);
   const prompt = buildPrompt({ title, content });
-  const data = await requestChatCompletion({
+  const outlineData = await requestChatCompletion({
     apiKey,
     baseUrl,
     model,
     prompt,
     timeoutMs,
+    maxTokens: Math.min(maxTokens, 2200),
   });
+  // Keep the first response small. Older providers often close the connection
+  // when asked for a complete multi-chapter storyboard in one response.
+  const data = hasGeneratedSteps(outlineData)
+    ? outlineData
+    : await completeLlmChapters({
+        outline: outlineData,
+        title,
+        content,
+        apiKey,
+        baseUrl,
+        model,
+        timeoutMs,
+        maxTokens,
+      });
   const project = attachVisualPlans(normalizeLlmProject(data, { title, content }));
   return withGeneration(project, {
     provider: "llm",
@@ -58,11 +75,18 @@ export async function buildProjectWithLlm({ title, content }) {
   });
 }
 
-async function requestChatCompletion({ apiKey, baseUrl, model, prompt, timeoutMs }) {
+async function requestChatCompletion({
+  apiKey,
+  baseUrl,
+  model,
+  prompt,
+  timeoutMs,
+  maxTokens,
+}) {
   const body = {
     model,
     temperature: 0.72,
-    response_format: { type: "json_object" },
+    max_tokens: maxTokens,
     messages: [
       {
         role: "system",
@@ -76,14 +100,31 @@ async function requestChatCompletion({ apiKey, baseUrl, model, prompt, timeoutMs
     ],
   };
 
-  const response = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  }, timeoutMs);
+  let response;
+  let lastError;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      response = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          Connection: "close",
+        },
+        body: JSON.stringify(body),
+      }, timeoutMs);
+      break;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 0 && isRetryableLlmError(error)) {
+        await sleep(800);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  if (!response) throw lastError || failedDependency("大模型请求失败。");
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
@@ -113,64 +154,106 @@ function buildPrompt({ title, content }) {
     "",
     "叙事主线：先从用户素材中挑一个最具体、最容易看见结果的真实案例作为贯穿案例。后续章节持续推进同一案例，让观众看到它从问题、第一次尝试、分支、工具调用、错误反馈到最终结果的变化。不要每一章重新发明一个互不相关的例子。",
     "",
-    "输出 JSON，结构必须是：",
+    "先只输出教学结构 JSON，结构必须是：",
     "{",
     '  "title": "视频标题",',
+    '  "case": "贯穿全片的真实案例",',
     '  "chapters": [',
-    '    { "id": "opening", "title": "章节标题", "steps": [',
-    "      {",
-    '        "screen": "屏幕上显示的短句",',
-    '        "narration": "这一屏对应的详细口播讲解",',
-    '        "visual": {',
-    '          "kind": "dialogue | workflow | loop | capabilities | tool-chain | memory | boundary | default",',
-    '          "action": "这一页画面正在演什么动作，例如 simulate-message / advance-task-chain",',
-    '          "subject": "画面主体，例如聊天机器人停在回答 / Agent 继续推进任务",',
-    '          "detail": "为什么这个视觉和这一页内容匹配",',
-    '          "labels": ["画面节点1", "画面节点2", "画面节点3"],',
-    '          "continuity": {',
-    '            "case": "贯穿案例的短名称，例如客服退款机器人",',
-    '            "state": "这一屏开始时案例处于什么状态",',
-    '            "change": "这一屏具体让案例发生了什么变化",',
-    '            "artifact": "观众能在画面上看到的证据，例如一段代码、一个分支或一条日志",',
-    '            "artifactType": "code | document | chat | table | branch | timeline | log | metric | quote | none"',
-    '          },',
-    '          "storyboard": {',
-    '            "sceneType": "contrast | workflow | capability-loop | tool-call | memory | risk-boundary | scenario | explain",',
-    '            "claim": "这一页要让观众相信的核心判断",',
-    '            "entities": ["画面里真实出现的主体1", "主体2", "主体3"],',
-    '            "beforeState": "动画开始前的状态",',
-    '            "actionSequence": ["动作1", "动作2", "动作3"],',
-    '            "afterState": "动画结束后的状态",',
-    '            "evidence": ["屏幕上能支撑 claim 的具体细节1", "细节2"],',
-    '            "visualMetaphor": "具体画面隐喻，例如 split-screen comparison / command center / approval gate"',
-    "          }",
-    "        }",
-    "      }",
-    "    ] }",
+    '    { "id": "opening", "title": "章节标题", "goal": "本章要讲清什么", "example": "本章使用的例子" }',
     "  ]",
     "}",
     "",
     "要求：",
-    "1. 生成 5 到 7 个章节，每章 3 到 5 屏，总屏数 15 到 28 屏。复杂知识宁可多拆几屏，不要压成几句口号。",
-    "2. screen 是屏幕短句：10 到 28 个中文字符，像视频画面标题，不要塞满解释。",
-    "3. narration 是真正口播：180 到 360 个中文字符。要像老师讲课一样解释原因、机制、例子和边界，不能只是重复 screen。",
-    "4. 每个 narration 必须能单独听懂，并自然衔接上一屏；每 2 到 3 屏至少出现一次具体例子、类比、反例或小测试。",
-    "5. id 只能使用小写英文、数字和连字符。",
-    "6. visual 必须跟每一页 screen/narration 的内容匹配，不能整章都用同一种 kind。一个章节内要有概念页、证据页、变化页和收束页的节奏差异。",
-    "7. continuity 和 storyboard 是最重要的：先写案例状态和变化，再写 claim、实体、前后状态、动作链。画面必须演 actionSequence，并展示 artifact 作为证据，而不是只展示 labels。",
-    "8. 画面语法要随内容改变：概念定义用留白和单个重点；代码/配置用可读的代码片段；分支/边界用路径和暂停节点；调试用错误、修正、通过的状态变化；对比才使用左右分栏。不要把每一页都做成流程卡片。",
-    "9. 如果讲聊天机器人和 Agent 区别，用 contrast；讲继续执行任务用 workflow；讲反馈调整用 loop；讲能力结构用 capability-loop；讲调用工具用 tool-call；讲记住进度用 memory；讲风险边界用 risk-boundary；讲办公/客服/开发等应用用 scenario。",
-    "10. visual 只描述画面意图和节点，不要输出颜色、CSS、代码或 Markdown。artifact 必须服务于口播正在讲的内容，并根据证据性质选择 artifactType：代码用 code，资料或报告用 document，对话用 chat，数据对照用 table，判断路径用 branch，进度安排用 timeline，运行反馈用 log，数字结果用 metric，定义或关键原话用 quote；没有适合证据时用 none，不要为了视觉效果硬塞代码。",
-    "11. 禁止输出元解释废话，例如“这部分需要听众理解背后的原因，而不只是看见屏幕上的一句话”“这一屏要强调的是”。直接讲内容本身，不要评价观众应该怎么理解屏幕。",
-    "12. narration 不能机械重复同一句信息或同一个场景名。不要写“比如，在办公场景里……在办公场景里……”，不要写“最后，所以”，不要连续用“具体来说/换句话说/更安全的方式是”复述上一句。",
-    "13. 讲解必须满足“五问”：它是什么、为什么出现、怎么运转、举个例子、边界在哪里。缺任何一项都算不合格。",
-    "14. 如果用户素材很短，也要围绕主题补全一版完整教学稿；如果素材很长，优先保留原素材里的关键例子、数字、对比和结论。",
+    "1. 生成 5 个章节；章节顺序要覆盖：问题、定义、机制、例子、边界与总结。",
+    "2. 只返回结构，不要在本次响应中生成 screen、narration、visual 或额外解释。",
+    "3. 贯穿案例要具体，后续每章都能继续推进它。案例可以是客服退款、办公流程或开发任务。",
+    "4. 规划要满足“五问”：它是什么、为什么出现、怎么运转、举个例子、边界在哪里。后续画面会使用 artifact 和 artifactType 作为证据。",
+    "5. 最终稿必须通俗易懂、完整详细，并至少穿插 2 个具体例子；后续每个例子都要有可呈现的 artifactType。",
     "",
     `视频主题：${clean(title) || "未命名视频"}`,
     "",
     "用户素材：",
     cleanMultiline(content) || "请围绕主题自行生成一版完整科普口播稿。",
   ].join("\n");
+}
+
+async function completeLlmChapters({
+  outline,
+  title,
+  content,
+  apiKey,
+  baseUrl,
+  model,
+  timeoutMs,
+  maxTokens,
+}) {
+  const chapters = normalizeLlmOutline(outline, title);
+  if (chapters.length === 0) {
+    throw failedDependency("大模型返回的教学结构不完整，请调整素材或模型后重试。");
+  }
+  const results = [];
+  for (const chapter of chapters) {
+    results.push(
+      await requestChatCompletion({
+        apiKey,
+        baseUrl,
+        model,
+        prompt: buildChapterPrompt({ title, content, outline, chapter }),
+        timeoutMs,
+        maxTokens: Math.min(maxTokens, 2800),
+      }),
+    );
+  }
+  return {
+    title: clean(outline?.title) || clean(title) || "AI 生成视频",
+    chapters: results.map((result, index) => normalizeLlmChapter(result, chapters[index])),
+  };
+}
+
+function buildChapterPrompt({ title, content, outline, chapter }) {
+  return [
+    "请只输出 JSON，不要 Markdown，不要解释：",
+    '{ "steps": [{ "screen": "10到28字的屏幕短句", "narration": "180到300字的详细中文口播", "visual": { "kind": "dialogue | workflow | loop | capabilities | tool-chain | memory | boundary | default", "action": "具体动作", "subject": "具体主体", "labels": ["节点1", "节点2", "节点3"] } }] }',
+    "",
+    `视频主题：${clean(title) || "未命名视频"}`,
+    `贯穿案例：${clean(outline?.case) || "一个具体真实使用案例"}`,
+    `本章：${clean(chapter.title)}；本章目标：${clean(chapter.goal)}；本章例子：${clean(chapter.example)}`,
+    "本章必须恰好生成 3 屏，口播要讲清原因、机制、例子和边界，不能只重复屏幕短句。",
+    "三屏要有节奏变化：解释、证据或例子、推进或收束。visual 必须匹配内容，不要每屏使用同一种画面。",
+    "禁止元话术和重复句式，直接讲知识本身；不要输出颜色、CSS、代码或 Markdown。",
+    "用户素材：",
+    cleanMultiline(content) || "围绕视频主题补全一版完整科普讲解。",
+  ].join("\n");
+}
+
+function hasGeneratedSteps(data) {
+  return Array.isArray(data?.chapters) && data.chapters.some(
+    (chapter) => Array.isArray(chapter?.steps) && chapter.steps.length > 0,
+  );
+}
+
+function normalizeLlmOutline(data, title) {
+  return (Array.isArray(data?.chapters) ? data.chapters : [])
+    .map((chapter, index) => ({
+      id: normalizeId(chapter?.id, index),
+      title: clean(chapter?.title) || `第 ${index + 1} 章`,
+      goal: clean(chapter?.goal) || "解释本章核心概念",
+      example: clean(chapter?.example) || "一个具体使用场景",
+    }))
+    .slice(0, MAX_LLM_CHAPTERS);
+}
+
+function normalizeLlmChapter(data, outline) {
+  const candidate = Array.isArray(data?.steps)
+    ? data
+    : Array.isArray(data?.chapters)
+      ? data.chapters[0]
+      : data;
+  return {
+    id: outline.id,
+    title: outline.title,
+    steps: Array.isArray(candidate?.steps) ? candidate.steps : [],
+  };
 }
 
 function normalizeLlmProject(data, input) {
@@ -271,6 +354,14 @@ async function fetchWithTimeout(url, options, timeoutMs) {
   }
 }
 
+function isRetryableLlmError(error) {
+  return error?.code === "FAILED_DEPENDENCY" && /无法连接大模型接口|请求超时/u.test(error.message);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function parseJsonFromModel(text) {
   try {
     return JSON.parse(text);
@@ -325,4 +416,10 @@ function cleanMultiline(value) {
 function trimDetail(value) {
   const text = String(value || "").replace(/\s+/g, " ").trim();
   return text.length > 300 ? `${text.slice(0, 300)}...` : text;
+}
+
+function normalizeMaxTokens(value) {
+  const parsed = Number(value || DEFAULT_LLM_MAX_TOKENS);
+  if (!Number.isFinite(parsed)) return DEFAULT_LLM_MAX_TOKENS;
+  return Math.min(24000, Math.max(4000, Math.round(parsed)));
 }

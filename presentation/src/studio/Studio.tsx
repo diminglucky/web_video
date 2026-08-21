@@ -220,7 +220,7 @@ export function Studio() {
   const createProject = async () => {
     setLoading(true);
     setError("");
-    setOperationMessage("");
+    setOperationMessage("正在调用后台大模型生成文稿，通常需要 2-4 分钟，请不要重复点击。");
     try {
       const project = await createProjectRequest({
         title,
@@ -629,6 +629,15 @@ export function Studio() {
       const ok = window.confirm("当前项目有未保存修改，进入新建文稿会丢失这些改动。确定继续？");
       if (!ok) return;
     }
+    window.localStorage.removeItem(STUDIO_ACTIVE_PROJECT_KEY);
+    setActiveProject(null);
+    setDraftTitle("");
+    setDraftChapters([]);
+    setPreviewGlobalStep(0);
+    setScriptApproved(false);
+    setStoryboardApproved(false);
+    setError("");
+    setOperationMessage("");
     setActivePage("script");
   };
 
@@ -665,8 +674,13 @@ export function Studio() {
           <h1>视频工作台</h1>
           <p>每次生成都是一个独立项目，左侧随时切换历史。</p>
         </div>
-        <button className="studio-new-project" onClick={openScriptComposer} type="button">
-          新建 / 生成文稿
+        <button
+          className="studio-new-project"
+          disabled={loading}
+          onClick={openScriptComposer}
+          type="button"
+        >
+          {loading ? "当前任务进行中..." : "新建 / 生成文稿"}
         </button>
         <ProjectLibrary
           activeProject={activeProject}

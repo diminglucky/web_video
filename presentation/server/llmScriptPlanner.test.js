@@ -322,7 +322,10 @@ test("buildProjectWithGenerator asks the LLM for detailed teaching narration wit
       content: "Demo content",
     });
 
+    assert.equal(requestBody.response_format, undefined);
+    assert.equal(requestBody.max_tokens, 2200);
     const prompt = requestBody.messages.map((message) => message.content).join("\n");
+    assert.equal(requestBody.model, "gpt-4o-mini");
     assert.match(prompt, /通俗易懂、完整详细/u);
     assert.match(prompt, /至少穿插 2 个具体例子/u);
     assert.match(prompt, /它是什么、为什么出现、怎么运转、举个例子、边界在哪里/u);
