@@ -222,7 +222,99 @@ function SceneIllustration({
     );
   }
 
-  // Workflow, scenario, and explain scenes share the input-to-result composition.
+  const scenario = inferScenarioVariant(teaching, visual);
+
+  if (scenario === "office") {
+    return (
+      <div className="gen-visual gen-scenario-office" aria-label={visual.detail}>
+        <div className="gen-office-source">
+          <span className="mono">INBOX</span>
+          <div className="gen-office-paper" aria-hidden="true"><i /><i /><i /><b /></div>
+          <strong>会议资料</strong>
+        </div>
+        <div className="gen-office-flow" aria-hidden="true"><i /><i /><i /></div>
+        <div className="gen-office-desk">
+          <span className="mono">WORKFLOW</span>
+          <div className="gen-office-timeline" aria-hidden="true">
+            <i /><i /><i />
+          </div>
+          <div className="gen-office-tasks">
+            {teaching.points.slice(0, 3).map((point, index) => (
+              <div key={`${point.title}-${index}`}>
+                <b>{String(index + 1).padStart(2, "0")}</b>
+                <strong>{shortLabel(point.title, ["提取重点", "追踪事项", "安排进度"][index])}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="gen-office-result">
+          <span className="mono">DELIVERABLE</span>
+          <div className="gen-office-report" aria-hidden="true"><i /><i /><i /><i /></div>
+          <strong>周报初稿</strong>
+        </div>
+      </div>
+    );
+  }
+
+  if (scenario === "support") {
+    return (
+      <div className="gen-visual gen-scenario-support" aria-label={visual.detail}>
+        <div className="gen-support-queue">
+          <span className="mono">QUEUE</span>
+          <div className="gen-support-ticket is-active"><b>01</b><i /><i /></div>
+          <div className="gen-support-ticket"><b>02</b><i /><i /></div>
+          <div className="gen-support-ticket"><b>03</b><i /><i /></div>
+          <strong>用户问题</strong>
+        </div>
+        <div className="gen-support-router">
+          <span className="mono">ROUTE</span>
+          <div className="gen-support-lens" aria-hidden="true"><i /></div>
+          <strong>判断类型</strong>
+        </div>
+        <div className="gen-support-lanes">
+          <div className="gen-support-lane is-fast">
+            <span className="mono">FAST PATH</span>
+            <b aria-hidden="true">✓</b>
+            <strong>直接处理</strong>
+          </div>
+          <div className="gen-support-lane is-human">
+            <span className="mono">ESCALATE</span>
+            <b aria-hidden="true">→</b>
+            <strong>转交人工</strong>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (scenario === "development") {
+    return (
+      <div className="gen-visual gen-scenario-development" aria-label={visual.detail}>
+        <div className="gen-dev-request">
+          <span className="mono">REQUEST</span>
+          <div className="gen-dev-lines" aria-hidden="true"><i /><i /><i /></div>
+          <strong>需求</strong>
+        </div>
+        <div className="gen-dev-code">
+          <div className="gen-dev-windowbar" aria-hidden="true"><i /><i /><i /></div>
+          <span className="mono">CODE</span>
+          <div className="gen-dev-code-lines" aria-hidden="true"><i /><i /><i /><i /><i /></div>
+          <strong>定位并修改</strong>
+        </div>
+        <div className="gen-dev-feedback" aria-hidden="true">
+          <svg viewBox="0 0 170 110"><path d="M 20 55 C 20 18, 140 18, 140 55" /><path d="M 140 55 C 140 92, 20 92, 20 55" /></svg>
+          <b>FEEDBACK</b>
+        </div>
+        <div className="gen-dev-test">
+          <span className="mono">TEST</span>
+          <div className="gen-dev-terminal" aria-hidden="true"><i /><i /><i /></div>
+          <strong>运行测试</strong>
+        </div>
+      </div>
+    );
+  }
+
+  // Generic workflow fallback for scenario content without a known domain.
   return (
     <div className="gen-visual gen-visual-scenario" aria-label={visual.detail}>
       <div className="gen-scenario-input">
@@ -603,4 +695,23 @@ function clean(value: unknown) {
 function shortLabel(value: unknown, fallback: string) {
   const label = clean(value);
   return label.length > 8 ? fallback : label || fallback;
+}
+
+function inferScenarioVariant(
+  teaching: TeachingContent,
+  visual: NormalizedVisual,
+): "office" | "support" | "development" | "generic" {
+  const text = [
+    visual.subject,
+    visual.detail,
+    visual.storyboard.claim,
+    visual.storyboard.entities.join(" "),
+    visual.storyboard.actionSequence.join(" "),
+    teaching.points.map((point) => `${point.title} ${point.detail}`).join(" "),
+  ].join(" ");
+
+  if (/(客服|订单|工单|查询|分流|用户问题|人工)/u.test(text)) return "support";
+  if (/(开发|编码|代码|测试|需求|报错|修正|终端)/u.test(text)) return "development";
+  if (/(办公|会议|邮件|周报|项目|整理|进度|资料)/u.test(text)) return "office";
+  return "generic";
 }
