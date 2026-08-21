@@ -24,8 +24,29 @@ export interface GeneratedVisualSpec {
   subject?: string;
   detail?: string;
   labels?: string[];
+  continuity?: GeneratedContinuity;
   storyboard?: GeneratedStoryboard;
 }
+
+export interface GeneratedContinuity {
+  case?: string;
+  state?: string;
+  change?: string;
+  artifact?: string;
+  artifactType?: GeneratedArtifactType | string;
+}
+
+export type GeneratedArtifactType =
+  | "code"
+  | "document"
+  | "chat"
+  | "table"
+  | "branch"
+  | "timeline"
+  | "log"
+  | "metric"
+  | "quote"
+  | "none";
 
 export type GeneratedSceneType =
   | "contrast"

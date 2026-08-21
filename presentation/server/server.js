@@ -17,6 +17,7 @@ import { testLocalTtsSettings, testOpenAiSpeechSettings } from "./tts.js";
 import { asyncHandler, sendError } from "./errors.js";
 import { getRuntimeHealth } from "./runtimeChecks.js";
 import { readSettings, saveSettings } from "./settings.js";
+import { assertTeachingQuality } from "./qualityGate.js";
 import {
   deleteProject,
   listProjects,
@@ -124,6 +125,11 @@ app.post("/api/projects", asyncHandler(async (req, res) => {
       render = false,
     } = req.body || {};
     const base = await buildProjectWithGenerator({ title, content });
+    const quality = assertTeachingQuality(base);
+    base.generation = {
+      ...base.generation,
+      quality: quality.metrics,
+    };
     const id = newProjectId();
     const project = {
       ...base,

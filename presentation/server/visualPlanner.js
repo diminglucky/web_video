@@ -52,24 +52,32 @@ const ACTION_BY_KIND = {
 };
 
 export function attachVisualPlans(project) {
+  const caseName = inferCaseName(
+    [project?.title, project?.content, ...(project?.chapters || []).map((chapter) =>
+      [chapter?.title, ...(chapter?.steps || [])].join(" "),
+    )].join(" "),
+  );
   return {
     ...project,
     chapters: (project.chapters || []).map((chapter) => ({
       ...chapter,
-      visuals: buildChapterVisuals(chapter),
+      visuals: buildChapterVisuals(chapter, caseName),
     })),
   };
 }
 
-export function buildChapterVisuals(chapter) {
+export function buildChapterVisuals(chapter, caseName = "") {
   const steps = Array.isArray(chapter?.steps) ? chapter.steps : [];
   const visuals = Array.isArray(chapter?.visuals) ? chapter.visuals : [];
+  const narrations = Array.isArray(chapter?.narrations) ? chapter.narrations : [];
   return steps.map((step, index) =>
     normalizeVisualSpec(visuals[index], {
       chapterId: chapter?.id,
       chapterTitle: chapter?.title,
       stepText: step,
+      narrationText: narrations[index],
       stepIndex: index,
+      caseName,
     }),
   );
 }
@@ -87,6 +95,7 @@ export function normalizeVisualSpec(spec, context = {}) {
     subject: clean(spec?.subject) || inferred.subject,
     detail: clean(spec?.detail) || inferred.detail,
     labels,
+    continuity: normalizeContinuity(spec?.continuity, { ...context, kind }),
   };
   return {
     ...base,
@@ -95,6 +104,79 @@ export function normalizeVisualSpec(spec, context = {}) {
       ...base,
     }),
   };
+}
+
+function normalizeContinuity(value, context) {
+  const text = clean(context.stepText) || `${context.chapterTitle || ""}`;
+  const narrationText = clean(context.narrationText);
+  const inferredArtifactType =
+    clean(value?.artifactType) === "none" && context.kind === "tools"
+      ? normalizeArtifactType(undefined, value?.artifact, `${text} ${narrationText}`)
+      : undefined;
+  return {
+    case: clean(context.caseName) || clean(value?.case) || inferCaseName(text),
+    state: clean(value?.state) || "问题还没有被处理",
+    change: clean(value?.change) || "画面把问题推进到下一步",
+    artifact: clean(value?.artifact) || "一个可检查的结果",
+    artifactType:
+      inferredArtifactType && inferredArtifactType !== "none"
+        ? inferredArtifactType
+        : normalizeArtifactType(value?.artifactType, value?.artifact, text),
+  };
+}
+
+function normalizeArtifactType(value, artifact, text) {
+  const key = clean(value).toLowerCase();
+  const allowed = new Set([
+    "code", "document", "chat", "table", "branch", "timeline", "log", "metric", "quote", "none",
+  ]);
+  if (allowed.has(key)) return key;
+  const artifactText = clean(artifact);
+  if (/(代码|函数|配置|接口|api|脚本)/iu.test(artifactText)) return "code";
+  if (/(日志|报错|trace|返回|运行结果|异常)/iu.test(artifactText)) return "log";
+  if (/(分支|路径|判断|转交|转人工|分流|审批|边界)/u.test(artifactText)) return "branch";
+  if (/(表格|预算|对比|字段|数据|列表|清单)/u.test(artifactText)) return "table";
+  if (/(指标|比例|增长|评分|数量|金额|数字)/u.test(artifactText)) return "metric";
+  if (/(文档|报告|资料|邮件|周报|文章|总结|纪要)/u.test(artifactText)) return "document";
+  if (/(聊天|消息|对话|回复)/u.test(artifactText)) return "chat";
+  if (/(进度|时间|追踪|历史|步骤|时间线)/u.test(artifactText)) return "timeline";
+  if (/(定义|原话|结论|一句话)/u.test(artifactText)) return "quote";
+  if (/(文档|报告|资料|邮件|周报|文章|总结|纪要|整理)/u.test(text)) return "document";
+  const source = `${artifactText} ${text}`;
+  if (/(代码|函数|配置|接口|api|脚本)/iu.test(source)) return "code";
+  if (/(日志|报错|trace|返回|运行结果|异常)/iu.test(source)) return "log";
+  if (/(分支|路径|判断|转交|转人工|分流|审批|边界)/u.test(source)) return "branch";
+  if (/(聊天|消息|对话|回复|客服)/u.test(source)) return "chat";
+  if (/(表格|预算|对比|字段|数据|列表|清单)/u.test(source)) return "table";
+  if (/(进度|时间|会议|追踪|历史|步骤)/u.test(source)) return "timeline";
+  if (/(指标|比例|增长|评分|数量|金额|数字)/u.test(source)) return "metric";
+  if (/(文档|报告|资料|邮件|周报|文章|总结)/u.test(source)) return "document";
+  if (/(定义|原话|结论|一句话)/u.test(source)) return "quote";
+  if (/(表格|预算|对比|字段|数据|列表|清单)/u.test(text)) return "table";
+  if (/(分支|路径|判断|转交|转人工|分流|审批|边界)/u.test(text)) return "branch";
+  if (/(进度|时间|会议|追踪|历史|步骤|安排|截止)/u.test(text)) return "timeline";
+  if (/(指标|比例|增长|评分|数量|金额|数字|转化率)/u.test(text)) return "metric";
+  if (/(日志|报错|trace|返回|运行结果|异常|调试)/iu.test(text)) return "log";
+  if (/(代码|函数|配置|接口|api|脚本)/iu.test(text)) return "code";
+  if (/(定义|原话|结论|一句话|观点)/u.test(text)) return "quote";
+  return "none";
+}
+
+function inferCaseName(text) {
+  if (/(贯穿案例|主线案例)[^。！？]{0,24}(旅行|航班|酒店|行程)/u.test(text)) {
+    return "一次旅行规划";
+  }
+  const candidates = [
+    ["一次旅行规划", /(旅行|航班|酒店|行程|预算)/gu],
+    ["客服问题处理", /(客服|订单|工单|分流|退款)/gu],
+    ["一次代码修改", /(开发|编码|代码|测试|报错|修正)/gu],
+    ["一项办公任务", /(办公|会议|邮件|周报|项目)/gu],
+  ];
+  const ranked = candidates
+    .map(([name, pattern]) => [name, (text.match(pattern) || []).length])
+    .sort((a, b) => b[1] - a[1]);
+  if (ranked[0][1] > 0) return ranked[0][0];
+  return "一个真实任务";
 }
 
 function inferVisualSpec({ chapterId = "", chapterTitle = "", stepText = "", stepIndex = 0 }) {
@@ -111,7 +193,11 @@ function inferVisualSpec({ chapterId = "", chapterTitle = "", stepText = "", ste
 
 function normalizeStoryboard(value, context) {
   const inferred = inferStoryboard(context);
-  const sceneType = normalizeSceneType(clean(value?.sceneType) || inferred.sceneType);
+  const requestedSceneType = normalizeSceneType(clean(value?.sceneType) || inferred.sceneType);
+  const sceneType =
+    requestedSceneType === "workflow" && inferred.sceneType !== "workflow"
+      ? inferred.sceneType
+      : requestedSceneType;
   const actionSequence = completeSequence(
     normalizeStringArray(value?.actionSequence),
     inferred.actionSequence,
@@ -124,9 +210,31 @@ function normalizeStoryboard(value, context) {
     beforeState: clean(value?.beforeState) || inferred.beforeState,
     actionSequence,
     afterState: clean(value?.afterState) || inferred.afterState,
-    evidence: completeEvidence(normalizeStringArray(value?.evidence), inferred.evidence, actionSequence),
+    evidence: completeEvidence(
+      isGenericEvidence(normalizeStringArray(value?.evidence))
+        ? []
+        : normalizeStringArray(value?.evidence),
+      inferred.evidence,
+      actionSequence,
+    ),
     visualMetaphor: clean(value?.visualMetaphor) || inferred.visualMetaphor,
   };
+}
+
+function isGenericEvidence(evidence) {
+  if (!Array.isArray(evidence) || evidence.length === 0) return true;
+  const generic = new Set([
+    "输入",
+    "过程",
+    "结果",
+    "工具请求",
+    "返回片段",
+    "汇总卡片",
+    "列出子任务",
+    "识别意图",
+    "一个可检查的结果",
+  ]);
+  return evidence.every((item) => generic.has(clean(item)));
 }
 
 function inferStoryboard(context) {
@@ -161,6 +269,7 @@ function inferStoryboard(context) {
   }
 
   if (sceneType === "tool-call") {
+    const teachingText = `${text} ${clean(context.narrationText)}`;
     return {
       sceneType,
       claim: "Agent 会把计划转成真实工具调用，而不是只给一段话。",
@@ -168,7 +277,7 @@ function inferStoryboard(context) {
       beforeState: "屏幕上只有一个待完成计划。",
       actionSequence: ["列出子任务", "调用工具", "汇总结果"],
       afterState: "计划变成带来源和结果的工作产物。",
-      evidence: ["工具请求", "返回片段", "汇总卡片"],
+      evidence: inferToolEvidence(teachingText),
       visualMetaphor: "command center",
     };
   }
@@ -225,12 +334,25 @@ function inferStoryboard(context) {
   };
 }
 
+function inferToolEvidence(text) {
+  if (/(航班|酒店|行程|余票|中转|住宿)/u.test(text)) {
+    return ["航班时间、价格和余票", "住宿位置、价格和取消规则", "行程选择依据"];
+  }
+  if (/(会议纪要|负责人|截止时间|待办|周报)/u.test(text)) {
+    return ["决定事项", "负责人和截止时间", "尚未更新的项目"];
+  }
+  if (/(资料|来源|报告|文章|文档)/u.test(text)) {
+    return ["来源资料", "提取出的重点", "可执行的整理结果"];
+  }
+  return ["工具请求", "返回片段", "汇总卡片"];
+}
+
 function inferSceneType(text, context) {
   if (/(区别|不是|而是|相比|对比|聊天机器人.*Agent|Agent.*聊天机器人)/u.test(text)) return "contrast";
   if (/(四个|能力|理解目标|规划任务|检查结果|闭环)/u.test(text)) return "capability-loop";
   if (/(工具|搜索|资料|文档|代码|测试|报告|调用|API|框架|市场)/u.test(text)) return "tool-call";
   if (/(记住|进度|已经|还差|从零|记录)/u.test(text)) return "memory";
-  if (/(风险|边界|确认|付款|删除|正式文件|不合适|人工|负责|决策)/u.test(text)) return "risk-boundary";
+  if (/(风险|边界|确认|付款|删除|正式文件|不合适|人工|负责|责任|决策|人和 Agent)/u.test(text)) return "risk-boundary";
   if (/(办公|客服|开发|旅行|行程|会议|邮件|工单|编码|修正|整理|追踪|分流)/u.test(text)) return "scenario";
   if (context.kind === "chat") return "contrast";
   if (context.kind === "capabilities") return "capability-loop";

@@ -51,7 +51,6 @@ export async function buildProjectWithLlm({ title, content }) {
     timeoutMs,
   });
   const project = attachVisualPlans(normalizeLlmProject(data, { title, content }));
-
   return withGeneration(project, {
     provider: "llm",
     model,
@@ -68,7 +67,7 @@ async function requestChatCompletion({ apiKey, baseUrl, model, prompt, timeoutMs
       {
         role: "system",
         content:
-          "你是中文教学型视频编剧、复杂知识讲解老师和网页视频分镜设计师。只输出 JSON，不要 Markdown。你的目标是把复杂知识讲得通俗、完整、详细，并用例子帮助理解。每一屏都必须先判断这一页要证明什么关系，再输出能被网页渲染的语义分镜 storyboard，不能只给装饰性标签。",
+          "你是中文教学型视频编剧、复杂知识讲解老师和网页视频分镜设计师。只输出 JSON，不要 Markdown。你的目标是把复杂知识讲得通俗、完整、详细，并用一个贯穿全片的真实案例帮助理解。每一屏都必须先判断这一页要证明什么关系，再输出能被网页渲染的语义分镜 storyboard，不能只给装饰性标签。",
       },
       {
         role: "user",
@@ -112,6 +111,8 @@ function buildPrompt({ title, content }) {
     "E. 解释常见误区、适用边界和容易踩坑的地方。",
     "F. 最后用一套可复述的框架收束，帮助观众判断自己是否听懂。",
     "",
+    "叙事主线：先从用户素材中挑一个最具体、最容易看见结果的真实案例作为贯穿案例。后续章节持续推进同一案例，让观众看到它从问题、第一次尝试、分支、工具调用、错误反馈到最终结果的变化。不要每一章重新发明一个互不相关的例子。",
+    "",
     "输出 JSON，结构必须是：",
     "{",
     '  "title": "视频标题",',
@@ -126,6 +127,13 @@ function buildPrompt({ title, content }) {
     '          "subject": "画面主体，例如聊天机器人停在回答 / Agent 继续推进任务",',
     '          "detail": "为什么这个视觉和这一页内容匹配",',
     '          "labels": ["画面节点1", "画面节点2", "画面节点3"],',
+    '          "continuity": {',
+    '            "case": "贯穿案例的短名称，例如客服退款机器人",',
+    '            "state": "这一屏开始时案例处于什么状态",',
+    '            "change": "这一屏具体让案例发生了什么变化",',
+    '            "artifact": "观众能在画面上看到的证据，例如一段代码、一个分支或一条日志",',
+    '            "artifactType": "code | document | chat | table | branch | timeline | log | metric | quote | none"',
+    '          },',
     '          "storyboard": {',
     '            "sceneType": "contrast | workflow | capability-loop | tool-call | memory | risk-boundary | scenario | explain",',
     '            "claim": "这一页要让观众相信的核心判断",',
@@ -148,14 +156,15 @@ function buildPrompt({ title, content }) {
     "3. narration 是真正口播：180 到 360 个中文字符。要像老师讲课一样解释原因、机制、例子和边界，不能只是重复 screen。",
     "4. 每个 narration 必须能单独听懂，并自然衔接上一屏；每 2 到 3 屏至少出现一次具体例子、类比、反例或小测试。",
     "5. id 只能使用小写英文、数字和连字符。",
-    "6. visual 必须跟每一页 screen/narration 的内容匹配，不能整章都用同一种 kind。",
-    "7. storyboard 是最重要的：先写 claim，再写实体、前后状态、动作链。画面必须演 actionSequence，而不是只展示 labels。",
-    "8. 如果讲聊天机器人和 Agent 区别，用 contrast；讲继续执行任务用 workflow；讲反馈调整用 loop；讲能力结构用 capability-loop；讲调用工具用 tool-call；讲记住进度用 memory；讲风险边界用 risk-boundary；讲办公/客服/开发等应用用 scenario。",
-    "9. visual 只描述画面意图和节点，不要输出颜色、CSS、代码或 Markdown。",
-    "10. 禁止输出元解释废话，例如“这部分需要听众理解背后的原因，而不只是看见屏幕上的一句话”“这一屏要强调的是”。直接讲内容本身，不要评价观众应该怎么理解屏幕。",
-    "11. narration 不能机械重复同一句信息或同一个场景名。不要写“比如，在办公场景里……在办公场景里……”，不要写“最后，所以”，不要连续用“具体来说/换句话说/更安全的方式是”复述上一句。",
-    "12. 讲解必须满足“五问”：它是什么、为什么出现、怎么运转、举个例子、边界在哪里。缺任何一项都算不合格。",
-    "13. 如果用户素材很短，也要围绕主题补全一版完整教学稿；如果素材很长，优先保留原素材里的关键例子、数字、对比和结论。",
+    "6. visual 必须跟每一页 screen/narration 的内容匹配，不能整章都用同一种 kind。一个章节内要有概念页、证据页、变化页和收束页的节奏差异。",
+    "7. continuity 和 storyboard 是最重要的：先写案例状态和变化，再写 claim、实体、前后状态、动作链。画面必须演 actionSequence，并展示 artifact 作为证据，而不是只展示 labels。",
+    "8. 画面语法要随内容改变：概念定义用留白和单个重点；代码/配置用可读的代码片段；分支/边界用路径和暂停节点；调试用错误、修正、通过的状态变化；对比才使用左右分栏。不要把每一页都做成流程卡片。",
+    "9. 如果讲聊天机器人和 Agent 区别，用 contrast；讲继续执行任务用 workflow；讲反馈调整用 loop；讲能力结构用 capability-loop；讲调用工具用 tool-call；讲记住进度用 memory；讲风险边界用 risk-boundary；讲办公/客服/开发等应用用 scenario。",
+    "10. visual 只描述画面意图和节点，不要输出颜色、CSS、代码或 Markdown。artifact 必须服务于口播正在讲的内容，并根据证据性质选择 artifactType：代码用 code，资料或报告用 document，对话用 chat，数据对照用 table，判断路径用 branch，进度安排用 timeline，运行反馈用 log，数字结果用 metric，定义或关键原话用 quote；没有适合证据时用 none，不要为了视觉效果硬塞代码。",
+    "11. 禁止输出元解释废话，例如“这部分需要听众理解背后的原因，而不只是看见屏幕上的一句话”“这一屏要强调的是”。直接讲内容本身，不要评价观众应该怎么理解屏幕。",
+    "12. narration 不能机械重复同一句信息或同一个场景名。不要写“比如，在办公场景里……在办公场景里……”，不要写“最后，所以”，不要连续用“具体来说/换句话说/更安全的方式是”复述上一句。",
+    "13. 讲解必须满足“五问”：它是什么、为什么出现、怎么运转、举个例子、边界在哪里。缺任何一项都算不合格。",
+    "14. 如果用户素材很短，也要围绕主题补全一版完整教学稿；如果素材很长，优先保留原素材里的关键例子、数字、对比和结论。",
     "",
     `视频主题：${clean(title) || "未命名视频"}`,
     "",

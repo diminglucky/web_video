@@ -326,6 +326,9 @@ test("buildProjectWithGenerator asks the LLM for detailed teaching narration wit
     assert.match(prompt, /通俗易懂、完整详细/u);
     assert.match(prompt, /至少穿插 2 个具体例子/u);
     assert.match(prompt, /它是什么、为什么出现、怎么运转、举个例子、边界在哪里/u);
+    assert.match(prompt, /贯穿案例/u);
+    assert.match(prompt, /artifact/u);
+    assert.match(prompt, /artifactType/u);
   } finally {
     restore("WEB_VIDEO_SCRIPT_PROVIDER", previousProvider);
     restore("OPENAI_API_KEY", previousKey);

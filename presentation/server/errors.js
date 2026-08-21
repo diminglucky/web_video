@@ -39,11 +39,12 @@ export function asyncHandler(fn) {
 
 export function sendError(error, res) {
   const isAppError = error instanceof AppError;
-  const status = isAppError ? error.status : 500;
+  const status = isAppError ? error.status : Number.isInteger(error?.status) ? error.status : 500;
   const body = {
     error: error?.message || "Internal server error",
-    code: isAppError ? error.code : "INTERNAL_ERROR",
+    code: isAppError ? error.code : error?.code || "INTERNAL_ERROR",
   };
   if (isAppError && error.details !== undefined) body.details = error.details;
+  if (!isAppError && error?.quality) body.details = error.quality;
   res.status(status).json(body);
 }

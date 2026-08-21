@@ -1,6 +1,8 @@
 import type { ChapterStepProps } from "../registry/types";
 import type {
   GeneratedChapter,
+  GeneratedArtifactType,
+  GeneratedContinuity,
   GeneratedSceneType,
   GeneratedStoryboard,
   GeneratedVisualKind,
@@ -12,10 +14,12 @@ interface Props extends ChapterStepProps {
   chapter: GeneratedChapter;
   index: number;
   projectTitle: string;
+  projectCase?: string;
 }
 
 type NormalizedVisual = Required<GeneratedVisualSpec> & {
   kind: GeneratedVisualKind;
+  continuity: Required<GeneratedContinuity> & { artifactType: GeneratedArtifactType };
   storyboard: Required<GeneratedStoryboard> & { sceneType: GeneratedSceneType };
 };
 
@@ -54,6 +58,7 @@ export function GeneratedChapterView({
   chapter,
   index,
   projectTitle,
+  projectCase,
   step,
 }: Props) {
   const screenText = clean(chapter.steps[step]) || "这一页的核心结论";
@@ -62,6 +67,7 @@ export function GeneratedChapterView({
     text: `${screenText} ${narration}`,
     chapterId: chapter.id,
     step,
+    caseName: projectCase,
   });
   const teaching = buildTeachingContent(screenText, narration, visual);
   const progress = `${String(step + 1).padStart(2, "0")} / ${String(
@@ -85,10 +91,22 @@ export function GeneratedChapterView({
           <div className="gen-kicker mono">
             Chapter {String(index + 1).padStart(2, "0")} / {chapter.title}
           </div>
-          <h2>{screenText}</h2>
+          <div className="gen-title-wrap">
+            <div className="gen-case-line">
+              <span className="mono">CASE</span>
+              <strong>{visual.continuity.case}</strong>
+              <span className="gen-case-change">{visual.continuity.change}</span>
+            </div>
+            <h2>{screenText}</h2>
+          </div>
         </main>
 
-        <SceneIllustration teaching={teaching} visual={visual} />
+        <SceneIllustration
+          teaching={teaching}
+          visual={visual}
+          contentText={screenText}
+          narration={narration}
+        />
       </div>
     </section>
   );
@@ -97,13 +115,20 @@ export function GeneratedChapterView({
 function SceneIllustration({
   teaching,
   visual,
+  contentText,
+  narration,
 }: {
   teaching: TeachingContent;
   visual: NormalizedVisual;
+  contentText: string;
+  narration: string;
 }) {
+  const evidenceLabel = visual.continuity.artifact;
+
   if (visual.storyboard.sceneType === "contrast") {
     return (
-      <div className="gen-visual gen-visual-contrast" aria-label={visual.detail}>
+      <div className="gen-visual gen-visual-contrast" aria-label={`${visual.detail} ${evidenceLabel}`}>
+        <ContinuityNote visual={visual} />
         <div className="gen-visual-axis gen-visual-axis-x" />
         <div className="gen-visual-axis gen-visual-axis-y" />
         <div className="gen-question-node">
@@ -132,9 +157,19 @@ function SceneIllustration({
     );
   }
 
+  const artifactType = visual.continuity.artifactType;
+  if (
+    visual.storyboard.sceneType !== "risk-boundary" &&
+    artifactType !== "none" &&
+    artifactType !== "chat"
+  ) {
+    return <ArtifactIllustration visual={visual} />;
+  }
+
   if (visual.storyboard.sceneType === "capability-loop") {
     return (
-      <div className="gen-visual gen-visual-loop" aria-label={visual.detail}>
+      <div className="gen-visual gen-visual-loop" aria-label={`${visual.detail} ${evidenceLabel}`}>
+        <ContinuityNote visual={visual} />
         <svg className="gen-loop-path" viewBox="0 0 760 520" aria-hidden="true">
           <circle cx="380" cy="260" r="182" />
           <path d="M 380 78 L 480 128 L 532 260 L 480 392 L 380 442" />
@@ -155,7 +190,8 @@ function SceneIllustration({
 
   if (visual.storyboard.sceneType === "tool-call") {
     return (
-      <div className="gen-visual gen-visual-chain" aria-label={visual.detail}>
+      <div className="gen-visual gen-visual-chain" aria-label={`${visual.detail} ${evidenceLabel}`}>
+        <ContinuityNote visual={visual} />
         <div className="gen-chain-input">
           <span className="mono">PLAN</span>
           <div className="gen-tool-glyph is-plan" aria-hidden="true" />
@@ -184,7 +220,8 @@ function SceneIllustration({
 
   if (visual.storyboard.sceneType === "memory") {
     return (
-      <div className="gen-visual gen-visual-ledger" aria-label={visual.detail}>
+      <div className="gen-visual gen-visual-ledger" aria-label={`${visual.detail} ${evidenceLabel}`}>
+        <ContinuityNote visual={visual} />
         <div className="gen-ledger-head">
           <span className="mono">PROGRESS MEMORY</span>
           <div className="gen-memory-orbit" aria-hidden="true"><i /><i /><i /></div>
@@ -202,31 +239,71 @@ function SceneIllustration({
   }
 
   if (visual.storyboard.sceneType === "risk-boundary") {
+    const riskStage = inferRiskStage(contentText);
     return (
-      <div className="gen-visual gen-visual-gate" aria-label={visual.detail}>
+      <div className={`gen-visual gen-visual-gate gen-risk-stage-${riskStage}`} aria-label={`${visual.detail} ${evidenceLabel}`}>
+        <ContinuityNote visual={visual} />
         <div className="gen-gate-side is-system">
-          <span className="mono">AGENT</span>
+          <span className="mono">{riskStage === "ownership" ? "HUMAN" : "AGENT"}</span>
           <div className="gen-gate-icon is-action" aria-hidden="true"><i /></div>
-          <strong>执行</strong>
+          <strong>{riskStage === "boundary" ? "准备行动" : riskStage === "confirm" ? "高风险动作" : "定方向"}</strong>
         </div>
         <div className="gen-gate-center">
-          <span className="mono">PAUSE</span>
-          <b>需要确认</b>
+          <span className="mono">{riskStage === "ownership" ? "DIVIDE" : riskStage === "confirm" ? "CONFIRM" : "BOUNDARY"}</span>
+          <b>{riskStage === "boundary" ? "先停在边界" : riskStage === "confirm" ? "需要确认" : "人机分工"}</b>
         </div>
         <div className="gen-gate-side is-human">
-          <span className="mono">HUMAN</span>
+          <span className="mono">{riskStage === "ownership" ? "AGENT" : "HUMAN"}</span>
           <div className="gen-gate-icon is-decision" aria-hidden="true"><i /></div>
-          <strong>决策</strong>
+          <strong>{riskStage === "ownership" ? "执行" : riskStage === "confirm" ? "确认" : "判断"}</strong>
         </div>
       </div>
     );
   }
 
-  const scenario = inferScenarioVariant(teaching, visual);
+  if (visual.kind === "agent-run") {
+    return <TaskRunIllustration visual={visual} />;
+  }
+
+  if (visual.kind === "loop") {
+    return <FeedbackIllustration visual={visual} />;
+  }
+
+  const scenario = inferScenarioVariant(teaching, visual, contentText, narration);
+
+  if (scenario === "travel") {
+    return (
+      <div className="gen-visual gen-scenario-travel" aria-label={visual.detail}>
+        <ContinuityNote visual={visual} />
+        <div className="gen-travel-route">
+          <span className="mono">WEEKEND PLAN</span>
+          <strong>周末去另一座城市</strong>
+          <div className="gen-travel-route-line" aria-hidden="true"><i /><i /><i /></div>
+          <small>交通方便 · 预算有限 · 半天自由活动</small>
+        </div>
+        <div className="gen-travel-constraint is-budget">
+          <span className="mono">CONSTRAINT 01</span>
+          <strong>预算</strong>
+          <small>不能超出可接受范围</small>
+        </div>
+        <div className="gen-travel-constraint is-transit">
+          <span className="mono">CONSTRAINT 02</span>
+          <strong>出行</strong>
+          <small>时间和中转都要核验</small>
+        </div>
+        <div className="gen-travel-constraint is-free">
+          <span className="mono">CONSTRAINT 03</span>
+          <strong>体验</strong>
+          <small>留出半天自由安排</small>
+        </div>
+      </div>
+    );
+  }
 
   if (scenario === "office") {
     return (
       <div className="gen-visual gen-scenario-office" aria-label={visual.detail}>
+        <ContinuityNote visual={visual} />
         <div className="gen-office-source">
           <span className="mono">INBOX</span>
           <div className="gen-office-paper" aria-hidden="true"><i /><i /><i /><b /></div>
@@ -259,6 +336,7 @@ function SceneIllustration({
   if (scenario === "support") {
     return (
       <div className="gen-visual gen-scenario-support" aria-label={visual.detail}>
+        <ContinuityNote visual={visual} />
         <div className="gen-support-queue">
           <span className="mono">QUEUE</span>
           <div className="gen-support-ticket is-active"><b>01</b><i /><i /></div>
@@ -290,6 +368,7 @@ function SceneIllustration({
   if (scenario === "development") {
     return (
       <div className="gen-visual gen-scenario-development" aria-label={visual.detail}>
+        <ContinuityNote visual={visual} />
         <div className="gen-dev-request">
           <span className="mono">REQUEST</span>
           <div className="gen-dev-lines" aria-hidden="true"><i /><i /><i /></div>
@@ -317,6 +396,7 @@ function SceneIllustration({
   // Generic workflow fallback for scenario content without a known domain.
   return (
     <div className="gen-visual gen-visual-scenario" aria-label={visual.detail}>
+      <ContinuityNote visual={visual} />
       <div className="gen-scenario-input">
         <span className="mono">INPUT</span>
         <div className="gen-scenario-symbol is-input" aria-hidden="true" />
@@ -336,6 +416,187 @@ function SceneIllustration({
       </div>
     </div>
   );
+}
+
+function TaskRunIllustration({ visual }: { visual: NormalizedVisual }) {
+  const steps = visual.storyboard.actionSequence.slice(0, 4);
+  return (
+    <div className="gen-visual gen-visual-task-run" aria-label={visual.detail}>
+      <ContinuityNote visual={visual} />
+      <div className="gen-task-run-goal">
+        <span className="mono">GOAL</span>
+        <strong>{shortLabel(visual.storyboard.entities[0], "用户目标")}</strong>
+      </div>
+      <div className="gen-task-run-line" aria-hidden="true" />
+      <div className="gen-task-run-steps">
+        {steps.map((item, index) => (
+          <div className={`gen-task-run-step is-${index}`} key={`${item}-${index}`}>
+            <i aria-hidden="true" />
+            <span className="mono">0{index + 1}</span>
+            <strong>{shortLabel(item, ["识别", "拆分", "执行", "检查"][index])}</strong>
+          </div>
+        ))}
+      </div>
+      <div className="gen-task-run-result">
+        <span className="mono">DELIVERABLE</span>
+        <strong>{shortLabel(visual.storyboard.afterState, "可交付结果")}</strong>
+      </div>
+    </div>
+  );
+}
+
+function FeedbackIllustration({ visual }: { visual: NormalizedVisual }) {
+  const steps = visual.storyboard.actionSequence.slice(0, 3);
+  return (
+    <div className="gen-visual gen-visual-feedback" aria-label={visual.detail}>
+      <ContinuityNote visual={visual} />
+      <div className="gen-feedback-ring" aria-hidden="true"><i /><i /><i /></div>
+      <div className="gen-feedback-core">
+        <span className="mono">FEEDBACK</span>
+        <strong>下一步会改变</strong>
+      </div>
+      {steps.map((item, index) => (
+        <div className={`gen-feedback-node is-${index}`} key={`${item}-${index}`}>
+          <span className="mono">0{index + 1}</span>
+          <strong>{shortLabel(item, ["尝试", "观察", "调整"][index])}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ContinuityNote({ visual }: { visual: NormalizedVisual }) {
+  if (
+    !visual.continuity.artifact ||
+    visual.continuity.artifact === "一个可检查的结果" ||
+    visual.continuity.artifactType === "none"
+  ) {
+    return null;
+  }
+  return (
+    <div className={`gen-evidence-note gen-evidence-${visual.continuity.artifactType}`}>
+      <i className="gen-evidence-glyph" aria-hidden="true" />
+      <div>
+        <span className="mono">{visual.continuity.artifactType}</span>
+        <strong>{clampText(visual.continuity.artifact, 38)}</strong>
+      </div>
+    </div>
+  );
+}
+
+function ArtifactIllustration({ visual }: { visual: NormalizedVisual }) {
+  const evidence = visual.storyboard.evidence;
+  const artifact = meaningfulArtifact(visual);
+
+  return (
+    <div
+      className={`gen-visual gen-artifact-visual gen-artifact-${visual.continuity.artifactType}`}
+      aria-label={`${visual.detail} ${artifact}`}
+    >
+      <ContinuityNote visual={visual} />
+      <div className="gen-artifact-heading">
+        <span className="mono">{visual.continuity.artifactType}</span>
+        <strong>{clampText(artifact, 42)}</strong>
+      </div>
+
+      {visual.continuity.artifactType === "document" && (
+        <div className="gen-document-sheet">
+          <div className="gen-document-title">{shortLabel(evidence[0], "核心资料")}</div>
+          <div className="gen-document-rule is-wide" />
+          <div className="gen-document-rule" />
+          <div className="gen-document-rule is-short" />
+          <div className="gen-document-highlight">{shortLabel(evidence[1], "提取重点")}</div>
+          <div className="gen-document-rule" />
+          <div className="gen-document-rule is-medium" />
+        </div>
+      )}
+
+      {visual.continuity.artifactType === "table" && (
+        <div className="gen-table-sheet">
+          <div className="gen-table-row is-head">
+            <span>{shortLabel(evidence[0], "维度")}</span>
+            <span>{shortLabel(evidence[1], "方案 A")}</span>
+            <span>{shortLabel(evidence[2], "方案 B")}</span>
+          </div>
+          {["输入", "差异", "结论"].map((label, index) => (
+            <div className="gen-table-row" key={label}>
+              <strong>{label}</strong>
+              <span>{shortLabel(evidence[index + 1], ["原始信息", "较轻", "可选"][index])}</span>
+              <span>{shortLabel(evidence[index + 2], ["整理后", "较稳", "推荐"][index])}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {visual.continuity.artifactType === "branch" && (
+        <div className="gen-branch-map">
+          <div className="gen-branch-start"><span className="mono">INPUT</span><strong>{shortLabel(evidence[0], "问题")}</strong></div>
+          <div className="gen-branch-split" aria-hidden="true"><i /><i /></div>
+          <div className="gen-branch-route is-top"><span className="mono">PATH A</span><strong>{shortLabel(evidence[1], "直接处理")}</strong></div>
+          <div className="gen-branch-route is-bottom"><span className="mono">PATH B</span><strong>{shortLabel(evidence[2], "升级判断")}</strong></div>
+        </div>
+      )}
+
+      {visual.continuity.artifactType === "timeline" && (
+        <div className="gen-timeline-map">
+          {evidence.slice(0, 4).map((item, index) => (
+            <div className={`gen-timeline-item is-${index}`} key={`${item}-${index}`}>
+              <i aria-hidden="true" />
+              <span className="mono">0{index + 1}</span>
+              <strong>{shortLabel(item, ["开始", "处理中", "已确认", "下一步"][index])}</strong>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {visual.continuity.artifactType === "metric" && (
+        <div className="gen-metric-scene">
+          <div className="gen-metric-number">{extractMetric(artifact, evidence)}</div>
+          <div className="gen-metric-caption">{shortLabel(evidence[0], "可验证变化")}</div>
+          <div className="gen-metric-bars" aria-hidden="true"><i /><i /><i /><i /></div>
+        </div>
+      )}
+
+      {visual.continuity.artifactType === "quote" && (
+        <blockquote className="gen-quote-scene">
+          <span aria-hidden="true">“</span>
+          <strong>{clampText(artifact, 110)}</strong>
+          <small>{shortLabel(evidence[1], "关键判断")}</small>
+        </blockquote>
+      )}
+
+      {visual.continuity.artifactType === "log" && (
+        <div className="gen-log-scene">
+          {evidence.slice(0, 4).map((item, index) => (
+            <div className={`gen-log-line is-${index === evidence.length - 1 ? "result" : "event"}`} key={`${item}-${index}`}>
+              <span className="mono">{index === evidence.length - 1 ? "OK" : ".."}</span>
+              <strong>{shortLabel(item, ["开始运行", "收到反馈", "定位问题", "完成"][index])}</strong>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {visual.continuity.artifactType === "code" && (
+        <div className="gen-code-scene">
+          <div className="gen-code-topline"><span className="mono">SOURCE</span><b>● ● ●</b></div>
+          {evidence.slice(0, 4).map((item, index) => (
+            <div className="gen-code-line" key={`${item}-${index}`}><i>{String(index + 1).padStart(2, "0")}</i><span>{shortLabel(item, ["输入", "处理", "返回", "检查"][index])}</span></div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function meaningfulArtifact(visual: NormalizedVisual) {
+  const artifact = clean(visual.continuity.artifact);
+  if (artifact && artifact !== "一个可检查的结果") return artifact;
+  return visual.storyboard.evidence[0] || visual.storyboard.claim || "可检查的结果";
+}
+
+function extractMetric(artifact: string, evidence: string[]) {
+  const match = `${artifact} ${evidence.join(" ")}`.match(/\d+(?:\.\d+)?\s*[%万亿千百十]?/u);
+  return match?.[0]?.replace(/\s+/g, "") || "变化";
 }
 
 interface TeachingContent {
@@ -395,7 +656,7 @@ function buildTeachingContent(
 
 function normalizeVisualSpec(
   spec: GeneratedVisualSpec | undefined,
-  context: { text: string; chapterId: string; step: number },
+  context: { text: string; chapterId: string; step: number; caseName?: string },
 ): NormalizedVisual {
   const fallbackKind = inferKind(context.text, context.chapterId, context.step);
   const kind = normalizeKind(spec?.kind || fallbackKind);
@@ -406,6 +667,7 @@ function normalizeVisualSpec(
     subject: clean(spec?.subject) || subjectForKind(kind, context.text),
     detail: clean(spec?.detail) || detailForKind(kind),
     labels,
+    continuity: normalizeContinuity(spec?.continuity, context.text, context.caseName),
   };
   return {
     ...visual,
@@ -694,14 +956,82 @@ function clean(value: unknown) {
 
 function shortLabel(value: unknown, fallback: string) {
   const label = clean(value);
-  return label.length > 8 ? fallback : label || fallback;
+  if (!label) return fallback;
+  return label.length > 16 ? `${label.slice(0, 15)}…` : label;
+}
+
+function normalizeContinuity(
+  value: GeneratedContinuity | undefined,
+  contextText: string,
+  projectCase?: string,
+): Required<GeneratedContinuity> & { artifactType: GeneratedArtifactType } {
+  return {
+    case: clean(projectCase) || clean(value?.case) || inferCaseName(contextText),
+    state: clean(value?.state) || "问题还没有被处理",
+    change: clean(value?.change) || "画面把一个抽象问题推进到下一步",
+    artifact: clean(value?.artifact) || "一个可检查的结果",
+    artifactType: normalizeArtifactType(value?.artifactType, value?.artifact, contextText),
+  };
+}
+
+function normalizeArtifactType(
+  value: unknown,
+  artifact: unknown,
+  text: string,
+): GeneratedArtifactType {
+  const key = clean(value).toLowerCase();
+  const allowed: GeneratedArtifactType[] = [
+    "code", "document", "chat", "table", "branch", "timeline", "log", "metric", "quote", "none",
+  ];
+  if (allowed.includes(key as GeneratedArtifactType)) return key as GeneratedArtifactType;
+  const artifactText = clean(artifact);
+  if (/(代码|函数|配置|接口|api|脚本)/iu.test(artifactText)) return "code";
+  if (/(日志|报错|trace|返回|运行结果|异常)/iu.test(artifactText)) return "log";
+  if (/(分支|路径|判断|转交|转人工|分流|审批|边界)/u.test(artifactText)) return "branch";
+  if (/(表格|预算|对比|字段|数据|列表|清单)/u.test(artifactText)) return "table";
+  if (/(指标|比例|增长|评分|数量|金额|数字)/u.test(artifactText)) return "metric";
+  if (/(文档|报告|资料|邮件|周报|文章|总结|纪要)/u.test(artifactText)) return "document";
+  if (/(聊天|消息|对话|回复)/u.test(artifactText)) return "chat";
+  if (/(进度|时间|追踪|历史|步骤|时间线)/u.test(artifactText)) return "timeline";
+  if (/(定义|原话|结论|一句话)/u.test(artifactText)) return "quote";
+  if (/(文档|报告|资料|邮件|周报|文章|总结|纪要|整理)/u.test(text)) return "document";
+  const source = `${artifactText} ${text}`;
+  if (/(代码|函数|配置|接口|api|脚本)/iu.test(source)) return "code";
+  if (/(日志|报错|trace|返回|运行结果|异常)/iu.test(source)) return "log";
+  if (/(分支|路径|判断|转交|转人工|分流|审批|边界)/u.test(source)) return "branch";
+  if (/(聊天|消息|对话|回复|客服)/u.test(source)) return "chat";
+  if (/(表格|预算|对比|字段|数据|列表|清单)/u.test(source)) return "table";
+  if (/(进度|时间|会议|追踪|历史|步骤)/u.test(source)) return "timeline";
+  if (/(指标|比例|增长|评分|数量|金额|数字)/u.test(source)) return "metric";
+  if (/(文档|报告|资料|邮件|周报|文章|总结)/u.test(source)) return "document";
+  if (/(定义|原话|结论|一句话)/u.test(source)) return "quote";
+  if (/(表格|预算|对比|字段|数据|列表|清单)/u.test(text)) return "table";
+  if (/(分支|路径|判断|转交|转人工|分流|审批|边界)/u.test(text)) return "branch";
+  if (/(进度|时间|会议|追踪|历史|步骤|安排|截止)/u.test(text)) return "timeline";
+  if (/(指标|比例|增长|评分|数量|金额|数字|转化率)/u.test(text)) return "metric";
+  if (/(日志|报错|trace|返回|运行结果|异常|调试)/iu.test(text)) return "log";
+  if (/(代码|函数|配置|接口|api|脚本)/iu.test(text)) return "code";
+  if (/(定义|原话|结论|一句话|观点)/u.test(text)) return "quote";
+  return "none";
+}
+
+function inferCaseName(text: string) {
+  if (/(客服|订单|工单|分流)/u.test(text)) return "客服问题处理";
+  if (/(开发|编码|代码|测试|报错)/u.test(text)) return "一次代码修改";
+  if (/(办公|会议|邮件|周报|项目)/u.test(text)) return "一项办公任务";
+  if (/(旅行|航班|酒店|行程)/u.test(text)) return "一次旅行规划";
+  return "一个真实任务";
 }
 
 function inferScenarioVariant(
   teaching: TeachingContent,
   visual: NormalizedVisual,
-): "office" | "support" | "development" | "generic" {
+  contentText: string,
+  narration: string,
+): "travel" | "office" | "support" | "development" | "generic" {
   const text = [
+    contentText,
+    narration,
     visual.subject,
     visual.detail,
     visual.storyboard.claim,
@@ -710,8 +1040,15 @@ function inferScenarioVariant(
     teaching.points.map((point) => `${point.title} ${point.detail}`).join(" "),
   ].join(" ");
 
+  if (/(旅行|航班|酒店|行程|预算|中转|自由活动)/u.test(text)) return "travel";
   if (/(客服|订单|工单|查询|分流|用户问题|人工)/u.test(text)) return "support";
   if (/(开发|编码|代码|测试|需求|报错|修正|终端)/u.test(text)) return "development";
   if (/(办公|会议|邮件|周报|项目|整理|进度|资料)/u.test(text)) return "office";
   return "generic";
+}
+
+function inferRiskStage(text: string): "boundary" | "confirm" | "ownership" {
+  if (/(高风险|确认|付款|删除|正式文件)/u.test(text)) return "confirm";
+  if (/(人负责|方向|决策|分工|责任|分担|人和 Agent)/u.test(text)) return "ownership";
+  return "boundary";
 }
