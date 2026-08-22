@@ -608,7 +608,7 @@ export function Studio() {
     setActivePage("design");
   };
 
-  const selectProject = (id: string, page: StudioPage = "script") => {
+  const selectProject = async (id: string, page: StudioPage = "script") => {
     if (id === activeProject?.id) {
       setActivePage(page);
       return;
@@ -617,11 +617,19 @@ export function Studio() {
       const ok = window.confirm("当前项目有未保存修改，切换项目会丢失这些改动。确定继续？");
       if (!ok) return;
     }
-    window.localStorage.setItem(STUDIO_ACTIVE_PROJECT_KEY, id);
-    setActivePage(page);
-    refreshProject(id, { resetPreview: true }).catch((err) =>
-      setError(err instanceof Error ? err.message : String(err)),
-    );
+    setLoading(true);
+    setError("");
+    setOperationMessage("正在打开项目...");
+    try {
+      await refreshProject(id, { resetPreview: true });
+      window.localStorage.setItem(STUDIO_ACTIVE_PROJECT_KEY, id);
+      setActivePage(page);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+      setOperationMessage("");
+    }
   };
 
   const openScriptComposer = () => {

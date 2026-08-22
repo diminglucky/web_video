@@ -193,9 +193,18 @@ function inferVisualSpec({ chapterId = "", chapterTitle = "", stepText = "", ste
 
 function normalizeStoryboard(value, context) {
   const inferred = inferStoryboard(context);
-  const requestedSceneType = normalizeSceneType(clean(value?.sceneType) || inferred.sceneType);
+  const contentObjects = normalizeContentObjects(value?.contentObjects);
+  const requestedSceneType = clean(value?.sceneType)
+    ? normalizeSceneType(value.sceneType)
+    : sceneTypeFromLayout(value?.layout) || inferred.sceneType;
+  // A complete storyboard is already a semantic decision from the model. Do
+  // not replace it with a keyword-derived scene just because the narration
+  // happens to contain words such as "工具" or "结果".
+  const hasModelStoryboard = Boolean(
+    clean(value?.sceneIntent) || clean(value?.layout) || contentObjects.length > 0,
+  );
   const sceneType =
-    requestedSceneType === "workflow" && inferred.sceneType !== "workflow"
+    !hasModelStoryboard && requestedSceneType === "workflow" && inferred.sceneType !== "workflow"
       ? inferred.sceneType
       : requestedSceneType;
   const actionSequence = completeSequence(
@@ -203,10 +212,15 @@ function normalizeStoryboard(value, context) {
     inferred.actionSequence,
     sceneType,
   );
+  const objectLabels = contentObjects.map((object) => object.label).filter(Boolean);
   return {
     sceneType,
+    sceneIntent: clean(value?.sceneIntent) || inferred.claim,
+    layout: normalizeLayout(value?.layout) || layoutForScene(sceneType),
     claim: clean(value?.claim) || inferred.claim,
-    entities: completeEntities(normalizeStringArray(value?.entities), inferred.entities),
+    entities: contentObjects.length > 0
+      ? uniqueLabels([...objectLabels, ...normalizeStringArray(value?.entities)]).slice(0, 6)
+      : completeEntities(normalizeStringArray(value?.entities), inferred.entities),
     beforeState: clean(value?.beforeState) || inferred.beforeState,
     actionSequence,
     afterState: clean(value?.afterState) || inferred.afterState,
@@ -218,7 +232,96 @@ function normalizeStoryboard(value, context) {
       actionSequence,
     ),
     visualMetaphor: clean(value?.visualMetaphor) || inferred.visualMetaphor,
+    contentObjects,
+    relations: normalizeRelations(value?.relations, contentObjects),
+    motion: normalizeMotion(value?.motion, contentObjects),
+    emphasis: clean(value?.emphasis),
   };
+}
+
+function normalizeContentObjects(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item, index) => {
+      if (typeof item === "string") {
+        const label = clean(item);
+        return label ? { id: `object-${index + 1}`, type: "concept", label } : null;
+      }
+      const label = clean(item?.label || item?.title || item?.name || item?.value);
+      if (!label) return null;
+      return {
+        id: clean(item?.id) || `object-${index + 1}`,
+        type: clean(item?.type) || "concept",
+        label,
+        value: clean(item?.value),
+        detail: clean(item?.detail || item?.description),
+        status: clean(item?.status),
+        emphasis: clean(item?.emphasis),
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
+function normalizeRelations(value, objects) {
+  if (!Array.isArray(value)) return [];
+  const ids = new Set(objects.map((object) => object.id));
+  return value
+    .map((relation) => ({
+      from: clean(relation?.from),
+      to: clean(relation?.to),
+      label: clean(relation?.label),
+      type: clean(relation?.type) || "leads-to",
+    }))
+    .filter((relation) => relation.from && relation.to && ids.has(relation.from) && ids.has(relation.to))
+    .slice(0, 8);
+}
+
+function normalizeMotion(value, objects) {
+  if (!Array.isArray(value)) return [];
+  const ids = new Set(objects.map((object) => object.id));
+  return value
+    .map((motion) => ({
+      target: clean(motion?.target || motion?.id),
+      action: clean(motion?.action || motion?.type),
+      at: clean(motion?.at),
+    }))
+    .filter((motion) => motion.target && motion.action && ids.has(motion.target))
+    .slice(0, 8);
+}
+
+function normalizeLayout(value) {
+  const key = clean(value).toLowerCase();
+  return ["sequence", "comparison", "state-change", "decision", "evidence", "definition", "map", "freeform"].includes(key)
+    ? key
+    : "";
+}
+
+function sceneTypeFromLayout(value) {
+  const layout = normalizeLayout(value);
+  return {
+    comparison: "contrast",
+    decision: "risk-boundary",
+    sequence: "workflow",
+    "state-change": "memory",
+    evidence: "explain",
+    definition: "explain",
+    map: "workflow",
+    freeform: "explain",
+  }[layout];
+}
+
+function layoutForScene(sceneType) {
+  return {
+    contrast: "comparison",
+    "risk-boundary": "decision",
+    "capability-loop": "map",
+    "tool-call": "sequence",
+    memory: "state-change",
+    scenario: "evidence",
+    explain: "definition",
+    workflow: "sequence",
+  }[sceneType] || "freeform";
 }
 
 function isGenericEvidence(evidence) {

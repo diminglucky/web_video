@@ -123,7 +123,7 @@ export function ProjectLibrary({
   activeProject: GeneratedProject | null;
   onDelete?: (id: string) => void;
   projects: ProjectListItem[];
-  onSelect: (id: string) => void;
+  onSelect: (id: string) => void | Promise<void>;
   variant?: "compact" | "large";
 }) {
   return (
@@ -145,7 +145,16 @@ export function ProjectLibrary({
             className={project.id === activeProject?.id ? "is-active" : ""}
             key={project.id}
           >
-            <button onClick={() => onSelect(project.id)} type="button">
+            <button
+              aria-label={`打开项目：${project.title}`}
+              className="studio-project-open"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                void onSelect(project.id);
+              }}
+              type="button"
+            >
               <i>{project.title.slice(0, 1).toUpperCase()}</i>
               <span className="studio-project-copy">
                 <strong>{project.title}</strong>
@@ -160,7 +169,11 @@ export function ProjectLibrary({
             {onDelete && (
               <button
                 className="studio-danger-action"
-                onClick={() => onDelete(project.id)}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onDelete(project.id);
+                }}
                 type="button"
               >
                 删除

@@ -2,7 +2,10 @@ import type { ChapterStepProps } from "../registry/types";
 import type {
   GeneratedChapter,
   GeneratedArtifactType,
+  GeneratedContentObject,
   GeneratedContinuity,
+  GeneratedMotion,
+  GeneratedRelation,
   GeneratedSceneType,
   GeneratedStoryboard,
   GeneratedVisualKind,
@@ -20,8 +23,37 @@ interface Props extends ChapterStepProps {
 type NormalizedVisual = Required<GeneratedVisualSpec> & {
   kind: GeneratedVisualKind;
   continuity: Required<GeneratedContinuity> & { artifactType: GeneratedArtifactType };
-  storyboard: Required<GeneratedStoryboard> & { sceneType: GeneratedSceneType };
+  storyboard: NormalizedStoryboard;
 };
+
+type NormalizedStoryboard = {
+  sceneType: GeneratedSceneType;
+  sceneIntent: string;
+  layout: string;
+  claim: string;
+  entities: string[];
+  beforeState: string;
+  actionSequence: string[];
+  afterState: string;
+  evidence: string[];
+  visualMetaphor: string;
+  contentObjects: GeneratedContentObject[];
+  relations: GeneratedRelation[];
+  motion: GeneratedMotion[];
+  emphasis: string;
+};
+
+type StoryboardSeed = Pick<
+  NormalizedStoryboard,
+  | "sceneType"
+  | "claim"
+  | "entities"
+  | "beforeState"
+  | "actionSequence"
+  | "afterState"
+  | "evidence"
+  | "visualMetaphor"
+>;
 
 const KIND_ALIASES: Record<string, GeneratedVisualKind> = {
   dialogue: "chat",
@@ -124,6 +156,10 @@ function SceneIllustration({
   narration: string;
 }) {
   const evidenceLabel = visual.continuity.artifact;
+
+  if (visual.storyboard.contentObjects.length >= 2) {
+    return <SemanticIllustration visual={visual} />;
+  }
 
   if (visual.storyboard.sceneType === "contrast") {
     return (
@@ -445,6 +481,94 @@ function TaskRunIllustration({ visual }: { visual: NormalizedVisual }) {
   );
 }
 
+function SemanticIllustration({ visual }: { visual: NormalizedVisual }) {
+  const storyboard = visual.storyboard;
+  const objects = storyboard.contentObjects.slice(0, 6);
+  const layout = normalizeSemanticLayout(storyboard.layout, storyboard.sceneType);
+  const objectById = new Map(objects.map((object) => [clean(object.id), object]));
+  const relations = storyboard.relations.filter(
+    (relation) => objectById.has(clean(relation.from)) && objectById.has(clean(relation.to)),
+  );
+
+  return (
+    <div
+      className={`gen-visual gen-semantic-visual gen-semantic-${layout}`}
+      aria-label={`${storyboard.sceneIntent} ${storyboard.claim}`}
+    >
+      <div className="gen-semantic-head">
+        <span className="mono">{shortLabel(storyboard.sceneIntent, "这一屏的关键关系")}</span>
+        <strong>{shortLabel(storyboard.emphasis || storyboard.claim, "把原因和证据放在一起")}</strong>
+      </div>
+
+      <div className="gen-semantic-stage">
+        {objects.map((object, index) => (
+          <article
+            className={`gen-semantic-object is-${object.status || "neutral"} ${motionClassFor(
+              storyboard.motion,
+              clean(object.id),
+            )}`}
+            key={clean(object.id) || `${object.label}-${index}`}
+          >
+            <span className="gen-semantic-object-type mono">{shortLabel(object.type, "对象")}</span>
+            <strong>{shortLabel(object.label, "未命名对象")}</strong>
+            {object.value && <b className="gen-semantic-value">{shortLabel(object.value, "")}</b>}
+            {object.detail && <small>{clampText(object.detail, 62)}</small>}
+            {object.status && <i>{shortLabel(object.status, "")}</i>}
+          </article>
+        ))}
+      </div>
+
+      {relations.length > 0 && (
+        <div className="gen-semantic-relations" aria-label="对象之间的关系">
+          {relations.slice(0, 4).map((relation, index) => (
+            <div className="gen-semantic-relation" key={`${relation.from}-${relation.to}-${index}`}>
+              <strong>{shortLabel(objectById.get(clean(relation.from))?.label, "对象")}</strong>
+              <i aria-hidden="true" />
+              <span>{shortLabel(relation.label || relation.type, "关联")}</span>
+              <i aria-hidden="true" />
+              <strong>{shortLabel(objectById.get(clean(relation.to))?.label, "对象")}</strong>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(storyboard.beforeState || storyboard.afterState) && (
+        <div className="gen-semantic-state">
+          <span>{shortLabel(storyboard.beforeState, "开始")}</span>
+          <i aria-hidden="true" />
+          <strong>{shortLabel(storyboard.afterState, "变化后的状态")}</strong>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function normalizeSemanticLayout(value: unknown, sceneType: GeneratedSceneType) {
+  const layout = clean(value).toLowerCase();
+  if (["sequence", "comparison", "state-change", "decision", "evidence", "definition", "map", "freeform"].includes(layout)) {
+    return layout;
+  }
+  return {
+    contrast: "comparison",
+    "risk-boundary": "decision",
+    memory: "state-change",
+    "capability-loop": "map",
+    "tool-call": "sequence",
+    scenario: "evidence",
+    explain: "definition",
+    workflow: "sequence",
+  }[sceneType] || "freeform";
+}
+
+function motionClassFor(motions: GeneratedMotion[], objectId: string) {
+  const action = motions.find((motion) => clean(motion.target) === objectId)?.action;
+  const normalized = clean(action).toLowerCase();
+  if (["appear", "move", "update", "split", "pulse"].includes(normalized)) {
+    return `has-motion motion-${normalized}`;
+  }
+  return "";
+}
+
 function FeedbackIllustration({ visual }: { visual: NormalizedVisual }) {
   const steps = visual.storyboard.actionSequence.slice(0, 3);
   return (
@@ -694,22 +818,119 @@ function normalizeStoryboard(
   },
 ): NormalizedVisual["storyboard"] {
   const inferred = inferStoryboard(context);
-  const sceneType = normalizeSceneType(storyboard?.sceneType || inferred.sceneType);
+  const contentObjects = cleanContentObjects(storyboard?.contentObjects);
+  const requestedSceneType = normalizeSceneType(
+    storyboard?.sceneType || sceneTypeFromLayout(storyboard?.layout) || inferred.sceneType,
+  );
+  const hasModelStoryboard = Boolean(
+    clean(storyboard?.sceneIntent) || clean(storyboard?.layout) || contentObjects.length > 0,
+  );
+  const sceneType =
+    !hasModelStoryboard && requestedSceneType === "workflow" && inferred.sceneType !== "workflow"
+      ? inferred.sceneType
+      : requestedSceneType;
   const actionSequence = completeList(
     cleanArray(storyboard?.actionSequence),
     inferred.actionSequence,
     sceneType === "capability-loop" ? 4 : 3,
   );
+  const objectLabels = contentObjects.map((object) => object.label).filter(Boolean) as string[];
   return {
     sceneType,
+    sceneIntent: clean(storyboard?.sceneIntent) || inferred.claim,
+    layout: clean(storyboard?.layout) || semanticLayoutForScene(sceneType),
     claim: clean(storyboard?.claim) || inferred.claim,
-    entities: completeList(cleanArray(storyboard?.entities), inferred.entities, 3),
+    entities: contentObjects.length
+      ? completeList(objectLabels, cleanArray(storyboard?.entities), 2)
+      : completeList(cleanArray(storyboard?.entities), inferred.entities, 3),
     beforeState: clean(storyboard?.beforeState) || inferred.beforeState,
     actionSequence,
     afterState: clean(storyboard?.afterState) || inferred.afterState,
     evidence: completeList(cleanArray(storyboard?.evidence), inferred.evidence, 3),
     visualMetaphor: clean(storyboard?.visualMetaphor) || inferred.visualMetaphor,
+    contentObjects,
+    relations: cleanRelations(storyboard?.relations, contentObjects),
+    motion: cleanMotion(storyboard?.motion, contentObjects),
+    emphasis: clean(storyboard?.emphasis),
   };
+}
+
+function cleanContentObjects(value: unknown): GeneratedContentObject[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item, index) => {
+      if (typeof item === "string") {
+        const label = clean(item);
+        return label ? { id: `object-${index + 1}`, type: "concept", label } : null;
+      }
+      const label = clean(item?.label || item?.title || item?.name || item?.value);
+      if (!label) return null;
+      return {
+        id: clean(item?.id) || `object-${index + 1}`,
+        type: clean(item?.type) || "concept",
+        label,
+        value: clean(item?.value),
+        detail: clean(item?.detail || item?.description),
+        status: clean(item?.status),
+        emphasis: clean(item?.emphasis),
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 6) as GeneratedContentObject[];
+}
+
+function cleanRelations(value: unknown, objects: GeneratedContentObject[]): GeneratedRelation[] {
+  if (!Array.isArray(value)) return [];
+  const ids = new Set(objects.map((object) => clean(object.id)));
+  return value
+    .map((relation) => ({
+      from: clean(relation?.from),
+      to: clean(relation?.to),
+      label: clean(relation?.label),
+      type: clean(relation?.type) || "leads-to",
+    }))
+    .filter((relation) => relation.from && relation.to && ids.has(relation.from) && ids.has(relation.to))
+    .slice(0, 8);
+}
+
+function cleanMotion(value: unknown, objects: GeneratedContentObject[]): GeneratedMotion[] {
+  if (!Array.isArray(value)) return [];
+  const ids = new Set(objects.map((object) => clean(object.id)));
+  return value
+    .map((motion) => ({
+      target: clean(motion?.target || motion?.id),
+      action: clean(motion?.action || motion?.type),
+      at: clean(motion?.at),
+    }))
+    .filter((motion) => motion.target && motion.action && ids.has(motion.target))
+    .slice(0, 8);
+}
+
+function sceneTypeFromLayout(value: unknown): GeneratedSceneType | "" {
+  const layout = clean(value).toLowerCase();
+  return ({
+    comparison: "contrast",
+    decision: "risk-boundary",
+    "state-change": "memory",
+    sequence: "workflow",
+    evidence: "explain",
+    definition: "explain",
+    map: "workflow",
+    freeform: "explain",
+  } as Record<string, GeneratedSceneType>)[layout] || "";
+}
+
+function semanticLayoutForScene(sceneType: GeneratedSceneType) {
+  return {
+    contrast: "comparison",
+    "risk-boundary": "decision",
+    memory: "state-change",
+    "capability-loop": "map",
+    "tool-call": "sequence",
+    scenario: "evidence",
+    explain: "definition",
+    workflow: "sequence",
+  }[sceneType] || "freeform";
 }
 
 function inferStoryboard(context: {
@@ -719,7 +940,7 @@ function inferStoryboard(context: {
   subject: string;
   chapterId: string;
   step: number;
-}): NormalizedVisual["storyboard"] {
+}): StoryboardSeed {
   const sceneType = inferSceneType(context.text, context.kind, context.chapterId, context.step);
   const labels = completeLabels(context.kind, context.labels, context.text);
   if (sceneType === "contrast") {

@@ -277,6 +277,80 @@ test("buildProjectWithGenerator keeps per-step visual plans from the model", asy
   }
 });
 
+test("buildProjectWithGenerator preserves semantic objects and relations from the model", async () => {
+  const previousProvider = process.env.WEB_VIDEO_SCRIPT_PROVIDER;
+  const previousKey = process.env.OPENAI_API_KEY;
+  const previousFetch = globalThis.fetch;
+
+  process.env.WEB_VIDEO_SCRIPT_PROVIDER = "llm-required";
+  process.env.OPENAI_API_KEY = "test-key";
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                title: "退款分流",
+                chapters: [
+                  {
+                    id: "example",
+                    title: "真实例子",
+                    steps: [
+                      {
+                        screen: "退款问题先判断条件",
+                        narration: "先看订单是否超过退款期限，再决定直接处理还是转人工。",
+                        visual: {
+                          storyboard: {
+                            sceneIntent: "退款期限决定处理路径",
+                            layout: "decision",
+                            contentObjects: [
+                              { id: "order", type: "document", label: "订单记录", detail: "包含下单日期" },
+                              { id: "deadline", type: "number", label: "退款期限", value: "7 天", status: "risk" },
+                              { id: "route", type: "decision", label: "处理路径", status: "active" },
+                            ],
+                            relations: [
+                              { from: "order", to: "deadline", label: "核对日期", type: "contains" },
+                              { from: "deadline", to: "route", label: "决定", type: "causes" },
+                            ],
+                            motion: [{ target: "route", action: "split", at: "during" }],
+                          },
+                        },
+                      },
+                    ],
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+
+  try {
+    const project = await buildProjectWithGenerator({
+      title: "Demo",
+      content: "客服退款分流",
+    });
+    const storyboard = project.chapters[0].visuals[0].storyboard;
+
+    assert.equal(storyboard.layout, "decision");
+    assert.equal(storyboard.sceneIntent, "退款期限决定处理路径");
+    assert.deepEqual(storyboard.contentObjects.map((object) => object.label), [
+      "订单记录",
+      "退款期限",
+      "处理路径",
+    ]);
+    assert.deepEqual(storyboard.relations.map((relation) => relation.label), ["核对日期", "决定"]);
+    assert.equal(storyboard.motion[0].action, "split");
+  } finally {
+    restore("WEB_VIDEO_SCRIPT_PROVIDER", previousProvider);
+    restore("OPENAI_API_KEY", previousKey);
+    globalThis.fetch = previousFetch;
+  }
+});
+
 test("buildProjectWithGenerator asks the LLM for detailed teaching narration with examples", async () => {
   const previousProvider = process.env.WEB_VIDEO_SCRIPT_PROVIDER;
   const previousKey = process.env.OPENAI_API_KEY;

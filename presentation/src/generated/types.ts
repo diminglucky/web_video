@@ -60,6 +60,8 @@ export type GeneratedSceneType =
 
 export interface GeneratedStoryboard {
   sceneType?: GeneratedSceneType | string;
+  sceneIntent?: string;
+  layout?: string;
   claim?: string;
   entities?: string[];
   beforeState?: string;
@@ -67,6 +69,33 @@ export interface GeneratedStoryboard {
   afterState?: string;
   evidence?: string[];
   visualMetaphor?: string;
+  contentObjects?: GeneratedContentObject[];
+  relations?: GeneratedRelation[];
+  motion?: GeneratedMotion[];
+  emphasis?: string;
+}
+
+export interface GeneratedContentObject {
+  id?: string;
+  type?: string;
+  label?: string;
+  value?: string;
+  detail?: string;
+  status?: string;
+  emphasis?: string;
+}
+
+export interface GeneratedRelation {
+  from?: string;
+  to?: string;
+  label?: string;
+  type?: string;
+}
+
+export interface GeneratedMotion {
+  target?: string;
+  action?: string;
+  at?: string;
 }
 
 export interface GeneratedChapter {

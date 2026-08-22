@@ -5,7 +5,7 @@ import { attachVisualPlans, normalizeVisualSpec } from "./visualPlanner.js";
 
 const DEFAULT_MODEL = "gpt-4o-mini";
 const DEFAULT_BASE_URL = "https://api.openai.com/v1";
-const DEFAULT_LLM_MAX_TOKENS = 2800;
+const DEFAULT_LLM_MAX_TOKENS = 4800;
 const MAX_LLM_CHAPTERS = 7;
 const MAX_LLM_STEPS_PER_CHAPTER = 5;
 
@@ -200,7 +200,7 @@ async function completeLlmChapters({
         model,
         prompt: buildChapterPrompt({ title, content, outline, chapter }),
         timeoutMs,
-        maxTokens: Math.min(maxTokens, 2800),
+        maxTokens: Math.min(maxTokens, 6000),
       }),
     );
   }
@@ -213,13 +213,16 @@ async function completeLlmChapters({
 function buildChapterPrompt({ title, content, outline, chapter }) {
   return [
     "请只输出 JSON，不要 Markdown，不要解释：",
-    '{ "steps": [{ "screen": "10到28字的屏幕短句", "narration": "180到300字的详细中文口播", "visual": { "kind": "dialogue | workflow | loop | capabilities | tool-chain | memory | boundary | default", "action": "具体动作", "subject": "具体主体", "labels": ["节点1", "节点2", "节点3"] } }] }',
+    '{ "steps": [{ "screen": "10到28字的屏幕短句", "narration": "180到300字的详细中文口播", "visual": { "kind": "dialogue | workflow | loop | capabilities | tool-chain | memory | boundary | default", "action": "具体动作", "subject": "具体主体", "labels": ["仅作兼容的短标签"], "continuity": { "case": "贯穿案例中的具体对象", "state": "这一屏开始时的状态", "change": "这一屏发生的变化", "artifact": "屏幕上真实可检查的产物", "artifactType": "document | chat | table | branch | timeline | metric | log | code | quote | none" }, "storyboard": { "sceneIntent": "这一屏要让观众看懂的具体关系", "layout": "sequence | comparison | state-change | decision | evidence | definition | map | freeform", "claim": "这一屏证明的具体判断", "beforeState": "变化前", "afterState": "变化后", "emphasis": "需要视觉强调的原因或差异", "contentObjects": [{ "id": "短英文id", "type": "message | person | document | number | decision | tool | state | concept | result", "label": "对象的真实名称", "value": "真实数字或短值，没有就留空", "detail": "对象在本例中的具体含义", "status": "waiting | active | done | blocked | risk，没有就留空" }], "relations": [{ "from": "对象id", "to": "对象id", "label": "两者的真实关系", "type": "leads-to | contrasts | causes | contains | blocks" }], "actionSequence": ["本屏实际发生的动作"], "evidence": ["本屏展示的真实证据"], "motion": [{ "target": "对象id", "action": "appear | move | update | split | pulse", "at": "before | during | after" }] } } }] }',
     "",
     `视频主题：${clean(title) || "未命名视频"}`,
     `贯穿案例：${clean(outline?.case) || "一个具体真实使用案例"}`,
     `本章：${clean(chapter.title)}；本章目标：${clean(chapter.goal)}；本章例子：${clean(chapter.example)}`,
     "本章必须恰好生成 3 屏，口播要讲清原因、机制、例子和边界，不能只重复屏幕短句。",
-    "三屏要有节奏变化：解释、证据或例子、推进或收束。visual 必须匹配内容，不要每屏使用同一种画面。",
+    "三屏要有节奏变化：解释、证据或例子、推进或收束。三屏必须根据各自内容选择不同 layout；同一章不能把所有画面都输出成左右对比、横向流程或圆环。",
+    "contentObjects 必须来自本章口播和用户素材中的真实对象、数字、动作或状态，至少 2 个，最多 6 个。不要使用 INPUT、OUTPUT、SYSTEM、AGENT、结果、过程、重点等空泛占位词，除非它们确实是内容中的对象。",
+    "relations 要表达这一屏真正的因果、先后、对比、包含或阻断关系；motion 要描述对象如何变化。没有代码时禁止选择 code 或渲染代码面板；没有真实数字时不要伪造数字。不同章节的对象名称、证据和布局必须跟着内容变化。",
+    "visual 必须匹配内容，不要只写装饰性标签；screen 是观众看到的短句，narration 是完整讲解，storyboard 是画面真正要呈现的证据。",
     "禁止元话术和重复句式，直接讲知识本身；不要输出颜色、CSS、代码或 Markdown。",
     "用户素材：",
     cleanMultiline(content) || "围绕视频主题补全一版完整科普讲解。",
@@ -363,17 +366,47 @@ function sleep(ms) {
 }
 
 function parseJsonFromModel(text) {
-  try {
-    return JSON.parse(text);
-  } catch {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) throw badRequest("大模型返回内容不是 JSON。");
+  const source = String(text || "").replace(/^```(?:json)?\s*/iu, "").replace(/\s*```$/u, "").trim();
+  const candidates = [source, ...extractBalancedJson(source)];
+  for (const candidate of candidates) {
     try {
-      return JSON.parse(match[0]);
+      return JSON.parse(candidate);
     } catch {
-      throw badRequest("大模型返回 JSON 解析失败。");
+      // Providers sometimes add a short preamble or trailing explanation.
+      // Try the next balanced object before treating the response as broken.
     }
   }
+  throw badRequest("大模型返回 JSON 解析失败，请重试；本次响应可能被截断或包含额外文本。");
+}
+
+function extractBalancedJson(source) {
+  const candidates = [];
+  for (let start = 0; start < source.length; start += 1) {
+    if (source[start] !== "{") continue;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = start; index < source.length; index += 1) {
+      const char = source[index];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (char === "\\") escaped = true;
+        else if (char === '"') inString = false;
+        continue;
+      }
+      if (char === '"') {
+        inString = true;
+        continue;
+      }
+      if (char === "{") depth += 1;
+      if (char === "}") depth -= 1;
+      if (depth === 0) {
+        candidates.push(source.slice(start, index + 1));
+        break;
+      }
+    }
+  }
+  return candidates.sort((a, b) => b.length - a.length);
 }
 
 function normalizeBaseUrl(value) {
