@@ -2775,10 +2775,10 @@
 .gen-semantic-visual {
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 20px;
-  min-height: 100%;
-  padding: clamp(28px, 5vw, 66px) clamp(24px, 6vw, 86px) 34px;
+  grid-template-rows: auto minmax(190px, 1fr) auto auto;
+  gap: 24px;
+  min-height: 0;
+  padding: clamp(22px, 3.4vw, 46px) clamp(24px, 5vw, 76px) 30px;
   overflow: hidden;
 }
 
@@ -2795,7 +2795,7 @@
   z-index: 1;
   display: grid;
   gap: 6px;
-  max-width: min(720px, 78%);
+  max-width: min(860px, 86%);
   animation: gen-rise 580ms var(--ease-quart) both 120ms;
 }
 
@@ -2812,7 +2812,7 @@
 
 .gen-semantic-head strong {
   color: #14201a;
-  font-size: clamp(18px, 2.2vw, 30px);
+  font-size: clamp(18px, 1.8vw, 28px);
   font-weight: 820;
   line-height: 1.2;
 }
@@ -2823,7 +2823,8 @@
   display: grid;
   align-content: center;
   gap: 14px;
-  min-height: 190px;
+  min-height: 0;
+  max-height: none;
   animation: gen-rise 720ms var(--ease-quart) both 260ms;
 }
 
@@ -2833,8 +2834,8 @@
   align-content: start;
   gap: 7px;
   min-width: 0;
-  min-height: 116px;
-  padding: 18px 20px 20px;
+  min-height: 132px;
+  padding: 16px 18px 18px;
   border-top: 2px solid rgba(20, 32, 26, 0.28);
   background: rgba(255, 255, 255, 0.24);
   animation: gen-object-in 620ms var(--ease-quart) both;
@@ -2865,7 +2866,7 @@
 .gen-semantic-object strong {
   overflow: hidden;
   color: #14201a;
-  font-size: clamp(19px, 2.4vw, 34px);
+  font-size: clamp(18px, 1.85vw, 30px);
   font-weight: 860;
   line-height: 1.08;
   text-overflow: ellipsis;
@@ -2881,7 +2882,7 @@
 
 .gen-semantic-value {
   color: #0f7b68;
-  font-size: clamp(25px, 3.2vw, 48px);
+  font-size: clamp(24px, 2.6vw, 42px);
   font-weight: 900;
   line-height: 0.95;
 }
@@ -2924,16 +2925,35 @@
 .gen-semantic-state i { position: relative; height: 1px; background: #0f7b68; }
 .gen-semantic-state i::after { content: ""; position: absolute; right: 0; top: -4px; border: 4px solid transparent; border-left-color: #0f7b68; }
 
-.gen-semantic-sequence .gen-semantic-stage { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.gen-semantic-comparison .gen-semantic-stage { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.gen-semantic-sequence .gen-semantic-stage { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.gen-semantic-comparison .gen-semantic-stage { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.gen-semantic-sequence .gen-semantic-object:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -18px;
+  width: 30px;
+  height: 1px;
+  background: rgba(15, 123, 104, 0.55);
+}
+
+.gen-semantic-sequence .gen-semantic-object:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  top: calc(50% - 4px);
+  right: -18px;
+  border: 4px solid transparent;
+  border-left-color: #0f7b68;
+  transform: translateX(30px);
+}
 .gen-semantic-comparison .gen-semantic-object:nth-child(odd) { border-top-color: #c46f2d; }
 .gen-semantic-state-change .gen-semantic-stage { grid-template-columns: 0.8fr 1.2fr 1fr; align-items: center; }
 .gen-semantic-state-change .gen-semantic-object:nth-child(2) { transform: translateY(-16px); border-color: #0f7b68; }
 .gen-semantic-decision .gen-semantic-stage { grid-template-columns: 1fr 0.7fr 1fr; align-items: center; }
 .gen-semantic-decision .gen-semantic-object:nth-child(2) { border-color: #c46f2d; transform: scale(1.06); }
-.gen-semantic-evidence .gen-semantic-stage { grid-template-columns: 1.35fr repeat(2, 1fr); align-items: end; }
+.gen-semantic-evidence .gen-semantic-stage { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; }
 .gen-semantic-evidence .gen-semantic-object:first-child { min-height: 190px; }
-.gen-semantic-definition .gen-semantic-stage { grid-template-columns: 1.35fr repeat(2, 0.8fr); align-items: center; }
+.gen-semantic-definition .gen-semantic-stage { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; }
 .gen-semantic-definition .gen-semantic-object:first-child { background: #10211b; border-color: #10211b; }
 .gen-semantic-definition .gen-semantic-object:first-child strong,
 .gen-semantic-definition .gen-semantic-object:first-child small,
@@ -2941,6 +2961,18 @@
 .gen-semantic-map .gen-semantic-stage { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .gen-semantic-map .gen-semantic-object:first-child { grid-column: span 2; justify-self: center; width: min(60%, 360px); border-color: #0f7b68; }
 .gen-semantic-freeform .gen-semantic-stage { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+
+.gen-semantic-count-2 .gen-semantic-stage,
+.gen-semantic-count-3 .gen-semantic-stage { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.gen-semantic-count-1 .gen-semantic-stage { grid-template-columns: minmax(0, 420px); }
+
+.gen-semantic-count-2 .gen-semantic-object:not(:last-child)::after,
+.gen-semantic-count-2 .gen-semantic-object:not(:last-child)::before,
+.gen-semantic-count-3 .gen-semantic-object:not(:last-child)::after,
+.gen-semantic-count-3 .gen-semantic-object:not(:last-child)::before {
+  display: none;
+}
 
 .gen-semantic-relations {
   position: relative;
@@ -3010,6 +3042,53 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@media (min-width: 901px) {
+  .gen-semantic-visual {
+    gap: 26px;
+    padding: 42px 92px 34px;
+  }
+
+  .gen-semantic-head strong {
+    font-size: 32px;
+  }
+
+  .gen-semantic-stage {
+    max-height: none;
+    min-height: 220px;
+  }
+
+  .gen-semantic-object {
+    min-height: 154px;
+    padding: 22px 24px 24px;
+  }
+
+  .gen-semantic-object-type {
+    font-size: 11px;
+  }
+
+  .gen-semantic-object strong {
+    font-size: 32px;
+  }
+
+  .gen-semantic-object small {
+    max-width: 320px;
+    font-size: 15px;
+  }
+
+  .gen-semantic-state span,
+  .gen-semantic-state strong {
+    font-size: 15px;
+  }
+
+  .gen-semantic-relation strong {
+    font-size: 14px;
+  }
+
+  .gen-semantic-relation span {
+    font-size: 12px;
+  }
+}
+
 @media (max-width: 900px) {
   .gen-semantic-visual { gap: 14px; padding: 24px 18px 22px; }
   .gen-semantic-head { max-width: 100%; }
@@ -3023,7 +3102,7 @@
   .gen-semantic-definition .gen-semantic-stage,
   .gen-semantic-map .gen-semantic-stage { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .gen-semantic-object { min-height: 96px; padding: 14px; }
-  .gen-semantic-object strong { font-size: 20px; }
+  .gen-semantic-object strong { font-size: 18px; }
   .gen-semantic-object small { font-size: 11px; }
   .gen-semantic-map .gen-semantic-object:first-child { width: auto; grid-column: span 2; }
   .gen-semantic-state-change .gen-semantic-object:nth-child(2),

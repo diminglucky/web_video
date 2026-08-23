@@ -1,3 +1,5 @@
+import { scenePlanFromLegacyVisual } from "./legacyVisualAdapter.js";
+
 const KIND_ALIASES = new Map([
   ["dialogue", "chat"],
   ["chatbot", "chat"],
@@ -70,16 +72,24 @@ export function buildChapterVisuals(chapter, caseName = "") {
   const steps = Array.isArray(chapter?.steps) ? chapter.steps : [];
   const visuals = Array.isArray(chapter?.visuals) ? chapter.visuals : [];
   const narrations = Array.isArray(chapter?.narrations) ? chapter.narrations : [];
-  return steps.map((step, index) =>
-    normalizeVisualSpec(visuals[index], {
+  return steps.map((step, index) => {
+    const visual = normalizeVisualSpec(visuals[index], {
       chapterId: chapter?.id,
       chapterTitle: chapter?.title,
       stepText: step,
       narrationText: narrations[index],
       stepIndex: index,
       caseName,
-    }),
-  );
+    });
+    const scenePlan = scenePlanFromLegacyVisual(visual, {
+      chapterId: chapter?.id,
+      chapterTitle: chapter?.title,
+      stepText: step,
+      narrationText: narrations[index],
+      stepIndex: index,
+    });
+    return scenePlan ? { ...visual, scenePlan } : visual;
+  });
 }
 
 export function normalizeVisualSpec(spec, context = {}) {
@@ -103,6 +113,7 @@ export function normalizeVisualSpec(spec, context = {}) {
       ...context,
       ...base,
     }),
+    scenePlan: spec?.scenePlan,
   };
 }
 
@@ -212,14 +223,26 @@ function normalizeStoryboard(value, context) {
     inferred.actionSequence,
     sceneType,
   );
-  const objectLabels = contentObjects.map((object) => object.label).filter(Boolean);
+  const semanticObjects = contentObjects.length > 0
+    ? contentObjects
+    : buildSemanticObjects({
+        entities: normalizeStringArray(value?.entities).length > 0
+          ? normalizeStringArray(value?.entities)
+          : inferred.entities,
+        actionSequence,
+        evidence: normalizeStringArray(value?.evidence).length > 0
+          ? normalizeStringArray(value?.evidence)
+          : inferred.evidence,
+        sceneType,
+      });
+  const objectLabels = semanticObjects.map((object) => object.label).filter(Boolean);
   return {
     sceneType,
     sceneIntent: clean(value?.sceneIntent) || inferred.claim,
     layout: normalizeLayout(value?.layout) || layoutForScene(sceneType),
     claim: clean(value?.claim) || inferred.claim,
-    entities: contentObjects.length > 0
-      ? uniqueLabels([...objectLabels, ...normalizeStringArray(value?.entities)]).slice(0, 6)
+    entities: semanticObjects.length > 0
+      ? uniqueLabels(objectLabels).slice(0, 6)
       : completeEntities(normalizeStringArray(value?.entities), inferred.entities),
     beforeState: clean(value?.beforeState) || inferred.beforeState,
     actionSequence,
@@ -232,11 +255,49 @@ function normalizeStoryboard(value, context) {
       actionSequence,
     ),
     visualMetaphor: clean(value?.visualMetaphor) || inferred.visualMetaphor,
-    contentObjects,
-    relations: normalizeRelations(value?.relations, contentObjects),
-    motion: normalizeMotion(value?.motion, contentObjects),
+    contentObjects: semanticObjects,
+    relations: normalizeRelations(value?.relations, semanticObjects).length > 0
+      ? normalizeRelations(value?.relations, semanticObjects)
+      : buildSemanticRelations(semanticObjects, sceneType),
+    motion: normalizeMotion(value?.motion, semanticObjects),
     emphasis: clean(value?.emphasis),
   };
+}
+
+function buildSemanticObjects({ entities, actionSequence, evidence, sceneType }) {
+  const labels = uniqueLabels(
+    entities.length > 0
+      ? entities
+      : [
+          ...actionSequence,
+          ...(isGenericEvidence(evidence) ? [] : evidence),
+        ],
+  ).filter((label) => !["输入", "过程", "结果", "重点", "概念"].includes(label));
+  const limit = sceneType === "capability-loop" ? 4 : sceneType === "contrast" ? 3 : 4;
+  return labels.slice(0, limit).map((label, index) => ({
+    id: `semantic-${index + 1}`,
+    type: sceneType === "risk-boundary" && index === limit - 1 ? "decision" : "concept",
+    label,
+    detail: genericDetail(evidence[index])
+      ? ""
+      : clean(evidence[index]) || clean(actionSequence[index]),
+    status: index === limit - 1 ? "active" : index < 1 ? "waiting" : "done",
+  }));
+}
+
+function genericDetail(value) {
+  return ["输入", "过程", "结果", "概念", "重点", "一个可检查的结果"].includes(clean(value));
+}
+
+function buildSemanticRelations(objects, sceneType) {
+  if (objects.length < 2) return [];
+  const relationLabel = sceneType === "contrast" ? "对比" : sceneType === "risk-boundary" ? "决定" : "推进到";
+  return objects.slice(1).map((object, index) => ({
+    from: objects[index].id,
+    to: object.id,
+    label: relationLabel,
+    type: sceneType === "contrast" ? "contrasts" : "leads-to",
+  }));
 }
 
 function normalizeContentObjects(value) {

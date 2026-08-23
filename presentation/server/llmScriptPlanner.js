@@ -5,7 +5,7 @@ import { attachVisualPlans, normalizeVisualSpec } from "./visualPlanner.js";
 
 const DEFAULT_MODEL = "gpt-4o-mini";
 const DEFAULT_BASE_URL = "https://api.openai.com/v1";
-const DEFAULT_LLM_MAX_TOKENS = 4800;
+const DEFAULT_LLM_MAX_TOKENS = 8000;
 const MAX_LLM_CHAPTERS = 7;
 const MAX_LLM_STEPS_PER_CHAPTER = 5;
 
@@ -164,7 +164,7 @@ function buildPrompt({ title, content }) {
     "}",
     "",
     "要求：",
-    "1. 生成 5 个章节；章节顺序要覆盖：问题、定义、机制、例子、边界与总结。",
+    "1. 生成 5 个章节；章节顺序要覆盖：问题、定义、机制、例子、边界与总结。每章必须有独立职责，不能只是换标题重复上一章。",
     "2. 只返回结构，不要在本次响应中生成 screen、narration、visual 或额外解释。",
     "3. 贯穿案例要具体，后续每章都能继续推进它。案例可以是客服退款、办公流程或开发任务。",
     "4. 规划要满足“五问”：它是什么、为什么出现、怎么运转、举个例子、边界在哪里。后续画面会使用 artifact 和 artifactType 作为证据。",
@@ -200,7 +200,7 @@ async function completeLlmChapters({
         model,
         prompt: buildChapterPrompt({ title, content, outline, chapter }),
         timeoutMs,
-        maxTokens: Math.min(maxTokens, 6000),
+        maxTokens: Math.min(maxTokens, 7000),
       }),
     );
   }
@@ -218,15 +218,25 @@ function buildChapterPrompt({ title, content, outline, chapter }) {
     `视频主题：${clean(title) || "未命名视频"}`,
     `贯穿案例：${clean(outline?.case) || "一个具体真实使用案例"}`,
     `本章：${clean(chapter.title)}；本章目标：${clean(chapter.goal)}；本章例子：${clean(chapter.example)}`,
-    "本章必须恰好生成 3 屏，口播要讲清原因、机制、例子和边界，不能只重复屏幕短句。",
-    "三屏要有节奏变化：解释、证据或例子、推进或收束。三屏必须根据各自内容选择不同 layout；同一章不能把所有画面都输出成左右对比、横向流程或圆环。",
+    `全片章节规划（用于避重复）：${JSON.stringify(chaptersForPrompt(outline))}`,
+    "本章必须恰好生成 3 屏，每屏口播 260 到 420 个中文字符。口播必须解释屏幕短句背后的原因、机制和例子，不能只换词复述屏幕短句。",
+    "本章三屏要形成独立推进：第 1 屏建立本章判断或问题，第 2 屏用本章专属证据或例子展开，第 3 屏给出本章的新结论或边界。禁止把全片的总定义、总流程、总边界在每一章重新讲一遍。",
+    "三屏必须根据各自内容选择不同 layout；同一章不能把所有画面都输出成左右对比、横向流程或圆环。screen 文案必须是能概括这一屏新信息的短句，不能与同章或其他章节的 screen 重复。",
     "contentObjects 必须来自本章口播和用户素材中的真实对象、数字、动作或状态，至少 2 个，最多 6 个。不要使用 INPUT、OUTPUT、SYSTEM、AGENT、结果、过程、重点等空泛占位词，除非它们确实是内容中的对象。",
     "relations 要表达这一屏真正的因果、先后、对比、包含或阻断关系；motion 要描述对象如何变化。没有代码时禁止选择 code 或渲染代码面板；没有真实数字时不要伪造数字。不同章节的对象名称、证据和布局必须跟着内容变化。",
     "visual 必须匹配内容，不要只写装饰性标签；screen 是观众看到的短句，narration 是完整讲解，storyboard 是画面真正要呈现的证据。",
-    "禁止元话术和重复句式，直接讲知识本身；不要输出颜色、CSS、代码或 Markdown。",
+    "禁止元话术和重复句式，连续两屏不要用相同的开头；直接讲知识本身；不要输出颜色、CSS、代码或 Markdown。",
     "用户素材：",
     cleanMultiline(content) || "围绕视频主题补全一版完整科普讲解。",
   ].join("\n");
+}
+
+function chaptersForPrompt(outline) {
+  return (Array.isArray(outline?.chapters) ? outline.chapters : []).map((chapter) => ({
+    title: clean(chapter?.title),
+    goal: clean(chapter?.goal),
+    example: clean(chapter?.example),
+  }));
 }
 
 function hasGeneratedSteps(data) {

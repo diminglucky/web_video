@@ -1,0 +1,220 @@
+.scene-chat {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 34px 42px 30px;
+  border: 1px solid rgba(20, 32, 26, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 26px 60px rgba(43, 35, 20, 0.1);
+}
+
+.scene-chat::before {
+  position: absolute;
+  top: -96px;
+  right: -70px;
+  width: 250px;
+  height: 250px;
+  border: 1px solid rgba(15, 123, 104, 0.14);
+  border-radius: 50%;
+  content: "";
+}
+
+.scene-chat-header,
+.scene-chat-footer,
+.scene-chat-message,
+.scene-chat-thinking {
+  position: relative;
+  z-index: 1;
+}
+
+.scene-chat-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 22px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid rgba(20, 32, 26, 0.12);
+}
+
+.scene-chat-header > div {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+
+.scene-chat-eyebrow,
+.scene-chat-actor,
+.scene-chat-status,
+.scene-chat-footer,
+.scene-chat-thinking span {
+  color: rgba(20, 32, 26, 0.58);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.scene-chat-eyebrow,
+.scene-chat-status {
+  text-transform: uppercase;
+}
+
+.scene-chat-header strong {
+  max-width: 520px;
+  color: #14201a;
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.scene-chat-status {
+  flex: 0 0 auto;
+  padding-top: 3px;
+  text-align: right;
+}
+
+.scene-chat-thread {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 18px;
+  padding: 26px 8px 22px;
+}
+
+.scene-chat-empty {
+  align-self: center;
+  padding: 20px 28px;
+  border: 1px dashed rgba(20, 32, 26, 0.2);
+  border-radius: 12px;
+  color: rgba(20, 32, 26, 0.55);
+  font-size: 18px;
+}
+
+.scene-chat-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  max-width: 88%;
+  animation: scene-chat-message-in 500ms var(--ease-quart) both;
+}
+
+.scene-chat-message.is-user {
+  align-self: flex-start;
+}
+
+.scene-chat-message.is-response {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.scene-chat-avatar {
+  display: grid;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 50%;
+  background: #14201a;
+  color: #fbfaf4;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.is-response .scene-chat-avatar {
+  background: #0f7b68;
+}
+
+.scene-chat-message-body {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.scene-chat-message p {
+  margin: 0;
+  padding: 15px 19px;
+  border: 1px solid rgba(20, 32, 26, 0.12);
+  border-radius: 4px 16px 16px 16px;
+  background: #fffdf7;
+  color: #14201a;
+  font-size: 21px;
+  line-height: 1.5;
+}
+
+.is-response .scene-chat-message p {
+  border-color: rgba(15, 123, 104, 0.22);
+  border-radius: 16px 4px 16px 16px;
+  background: rgba(15, 123, 104, 0.1);
+}
+
+.scene-chat-thinking {
+  display: flex;
+  align-items: center;
+  align-self: flex-end;
+  gap: 5px;
+  padding: 4px 9px;
+}
+
+.scene-chat-thinking i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #0f7b68;
+  animation: scene-chat-dot 900ms ease-in-out infinite;
+}
+
+.scene-chat-thinking i:nth-child(2) { animation-delay: 120ms; }
+.scene-chat-thinking i:nth-child(3) { animation-delay: 240ms; }
+
+.scene-chat-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(20, 32, 26, 0.12);
+}
+
+.scene-chat-progress {
+  width: 180px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(20, 32, 26, 0.12);
+}
+
+.scene-chat-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #0f7b68;
+  transition: width 250ms ease-out;
+}
+
+@keyframes scene-chat-message-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scene-chat-dot {
+  0%, 100% { opacity: 0.3; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-chat-message,
+  .scene-chat-thinking i {
+    animation: none;
+  }
+
+  .scene-chat-progress i {
+    transition: none;
+  }
+}

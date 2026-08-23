@@ -2,6 +2,8 @@ import type { ComponentType } from "react";
 
 export interface ChapterStepProps {
   step: number; // 0..(narrations.length - 1)
+  /** Optional deterministic scene time used by browser/MP4 rendering. */
+  timeMs?: number;
 }
 
 /**

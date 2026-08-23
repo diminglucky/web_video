@@ -11,6 +11,8 @@ import type {
   GeneratedVisualKind,
   GeneratedVisualSpec,
 } from "./types";
+import type { ScenePlan } from "./sceneTypes";
+import { SceneRenderer } from "./SceneRenderer";
 import "./GeneratedChapter.css";
 
 interface Props extends ChapterStepProps {
@@ -20,10 +22,11 @@ interface Props extends ChapterStepProps {
   projectCase?: string;
 }
 
-type NormalizedVisual = Required<GeneratedVisualSpec> & {
+type NormalizedVisual = Omit<Required<GeneratedVisualSpec>, "scenePlan"> & {
   kind: GeneratedVisualKind;
   continuity: Required<GeneratedContinuity> & { artifactType: GeneratedArtifactType };
   storyboard: NormalizedStoryboard;
+  scenePlan?: ScenePlan;
 };
 
 type NormalizedStoryboard = {
@@ -92,6 +95,7 @@ export function GeneratedChapterView({
   projectTitle,
   projectCase,
   step,
+  timeMs,
 }: Props) {
   const screenText = clean(chapter.steps[step]) || "这一页的核心结论";
   const narration = clean(chapter.narrations?.[step]) || screenText;
@@ -138,6 +142,7 @@ export function GeneratedChapterView({
           visual={visual}
           contentText={screenText}
           narration={narration}
+          timeMs={timeMs}
         />
       </div>
     </section>
@@ -149,16 +154,58 @@ function SceneIllustration({
   visual,
   contentText,
   narration,
+  timeMs,
 }: {
   teaching: TeachingContent;
   visual: NormalizedVisual;
   contentText: string;
   narration: string;
+  timeMs?: number;
+}) {
+  if (visual.scenePlan) {
+    return (
+      <SceneRenderer
+        plan={visual.scenePlan}
+        timeMs={timeMs}
+        fallback={
+          <LegacySceneIllustration
+            teaching={teaching}
+            visual={visual}
+            contentText={contentText}
+            narration={narration}
+            timeMs={timeMs}
+          />
+        }
+      />
+    );
+  }
+  return (
+    <LegacySceneIllustration
+      teaching={teaching}
+      visual={visual}
+      contentText={contentText}
+      narration={narration}
+      timeMs={timeMs}
+    />
+  );
+}
+
+function LegacySceneIllustration({
+  teaching,
+  visual,
+  contentText,
+  narration,
+}: {
+  teaching: TeachingContent;
+  visual: NormalizedVisual;
+  contentText: string;
+  narration: string;
+  timeMs?: number;
 }) {
   const evidenceLabel = visual.continuity.artifact;
 
   if (visual.storyboard.contentObjects.length >= 2) {
-    return <SemanticIllustration visual={visual} />;
+    return <SemanticIllustration visual={visual} contentText={contentText} />;
   }
 
   if (visual.storyboard.sceneType === "contrast") {
@@ -481,10 +528,21 @@ function TaskRunIllustration({ visual }: { visual: NormalizedVisual }) {
   );
 }
 
-function SemanticIllustration({ visual }: { visual: NormalizedVisual }) {
+function SemanticIllustration({
+  visual,
+  contentText,
+}: {
+  visual: NormalizedVisual;
+  contentText: string;
+}) {
   const storyboard = visual.storyboard;
-  const objects = storyboard.contentObjects.slice(0, 6);
+  const objects = storyboard.contentObjects.slice(0, 4);
   const layout = normalizeSemanticLayout(storyboard.layout, storyboard.sceneType);
+  const semanticHeadline = isSameIdea(storyboard.sceneIntent, contentText)
+    ? clean(storyboard.emphasis) && !isSameIdea(storyboard.emphasis, contentText)
+      ? storyboard.emphasis
+      : ""
+    : storyboard.sceneIntent;
   const objectById = new Map(objects.map((object) => [clean(object.id), object]));
   const relations = storyboard.relations.filter(
     (relation) => objectById.has(clean(relation.from)) && objectById.has(clean(relation.to)),
@@ -492,13 +550,15 @@ function SemanticIllustration({ visual }: { visual: NormalizedVisual }) {
 
   return (
     <div
-      className={`gen-visual gen-semantic-visual gen-semantic-${layout}`}
+      className={`gen-visual gen-semantic-visual gen-semantic-${layout} gen-semantic-count-${objects.length}`}
       aria-label={`${storyboard.sceneIntent} ${storyboard.claim}`}
     >
-      <div className="gen-semantic-head">
-        <span className="mono">{shortLabel(storyboard.sceneIntent, "这一屏的关键关系")}</span>
-        <strong>{shortLabel(storyboard.emphasis || storyboard.claim, "把原因和证据放在一起")}</strong>
-      </div>
+      {semanticHeadline && (
+        <div className="gen-semantic-head">
+          <span className="mono">这一屏的关键关系</span>
+          <strong>{shortLabel(semanticHeadline, "把原因和证据放在一起")}</strong>
+        </div>
+      )}
 
       <div className="gen-semantic-stage">
         {objects.map((object, index) => (
@@ -512,15 +572,15 @@ function SemanticIllustration({ visual }: { visual: NormalizedVisual }) {
             <span className="gen-semantic-object-type mono">{shortLabel(object.type, "对象")}</span>
             <strong>{shortLabel(object.label, "未命名对象")}</strong>
             {object.value && <b className="gen-semantic-value">{shortLabel(object.value, "")}</b>}
-            {object.detail && <small>{clampText(object.detail, 62)}</small>}
+            {object.detail && !isGenericDetail(object.detail) && <small>{clampText(object.detail, 62)}</small>}
             {object.status && <i>{shortLabel(object.status, "")}</i>}
           </article>
         ))}
       </div>
 
-      {relations.length > 0 && (
+      {relations.length > 0 && !["sequence", "map"].includes(layout) && (
         <div className="gen-semantic-relations" aria-label="对象之间的关系">
-          {relations.slice(0, 4).map((relation, index) => (
+          {relations.slice(0, 2).map((relation, index) => (
             <div className="gen-semantic-relation" key={`${relation.from}-${relation.to}-${index}`}>
               <strong>{shortLabel(objectById.get(clean(relation.from))?.label, "对象")}</strong>
               <i aria-hidden="true" />
@@ -532,7 +592,8 @@ function SemanticIllustration({ visual }: { visual: NormalizedVisual }) {
         </div>
       )}
 
-      {(storyboard.beforeState || storyboard.afterState) && (
+      {(storyboard.beforeState && storyboard.afterState &&
+        !isGenericState(storyboard.beforeState) && !isGenericState(storyboard.afterState)) && (
         <div className="gen-semantic-state">
           <span>{shortLabel(storyboard.beforeState, "开始")}</span>
           <i aria-hidden="true" />
@@ -541,6 +602,14 @@ function SemanticIllustration({ visual }: { visual: NormalizedVisual }) {
       )}
     </div>
   );
+}
+
+function isGenericState(value: string) {
+  return /^(观众先看到一个未处理的问题|画面收束到一个清晰结论|问题还没有被处理|一个可检查的结果)[。.!！]?$/u.test(clean(value));
+}
+
+function isGenericDetail(value: string) {
+  return /^(输入|过程|结果|概念|重点|Agent靠目标驱动|一个可检查的结果)[。.!！]?$/u.test(clean(value));
 }
 
 function normalizeSemanticLayout(value: unknown, sceneType: GeneratedSceneType) {
@@ -803,6 +872,7 @@ function normalizeVisualSpec(
       chapterId: context.chapterId,
       step: context.step,
     }),
+    scenePlan: spec?.scenePlan,
   };
 }
 

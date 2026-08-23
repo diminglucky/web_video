@@ -1,4 +1,5 @@
 import type { ChapterDef } from "../registry/types";
+import type { ScenePlan } from "./sceneTypes";
 
 export interface GeneratedSegment {
   chapter: string;
@@ -26,6 +27,7 @@ export interface GeneratedVisualSpec {
   labels?: string[];
   continuity?: GeneratedContinuity;
   storyboard?: GeneratedStoryboard;
+  scenePlan?: ScenePlan;
 }
 
 export interface GeneratedContinuity {

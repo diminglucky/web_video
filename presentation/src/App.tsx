@@ -33,8 +33,10 @@ export default function App() {
   const projectId = params.get("project");
   const isStudio = window.location.pathname === "/studio";
   const renderStep = params.get("renderStep");
+  const renderTime = params.get("renderTime");
   const renderGlobalStep =
     renderStep == null ? null : Number.parseInt(renderStep, 10);
+  const renderTimeMs = renderTime == null ? null : Number.parseInt(renderTime, 10);
 
   if (isStudio) return <Studio />;
   if (projectId)
@@ -44,6 +46,7 @@ export default function App() {
         renderGlobalStep={
           Number.isFinite(renderGlobalStep) ? renderGlobalStep : null
         }
+        renderTimeMs={Number.isFinite(renderTimeMs) ? renderTimeMs : null}
       />
     );
 
@@ -53,9 +56,11 @@ export default function App() {
 function GeneratedPresentation({
   projectId,
   renderGlobalStep,
+  renderTimeMs,
 }: {
   projectId: string;
   renderGlobalStep: number | null;
+  renderTimeMs: number | null;
 }) {
   const [project, setProject] = useState<GeneratedProject | null>(null);
   const [error, setError] = useState("");
@@ -89,7 +94,8 @@ function GeneratedPresentation({
         audioBasePath={runtime.audioBasePath}
         githubUrl={null}
         storageKey={`presentation-cursor-${projectId}`}
-      renderGlobalStep={renderGlobalStep}
+        renderGlobalStep={renderGlobalStep}
+        renderTimeMs={renderTimeMs}
     />
   );
 }
@@ -101,6 +107,7 @@ function PresentationPlayer({
   githubUrl,
   storageKey,
   renderGlobalStep = null,
+  renderTimeMs = null,
 }: {
   chapters: typeof CHAPTERS;
   audioByStep?: Record<string, string>;
@@ -108,6 +115,7 @@ function PresentationPlayer({
   githubUrl?: string | null;
   storageKey?: string;
   renderGlobalStep?: number | null;
+  renderTimeMs?: number | null;
 }) {
   const stepper = useStepper(
     chapters,
@@ -146,7 +154,7 @@ function PresentationPlayer({
     <>
       <Stage onAdvance={stepper.next}>
         <div key={activeChapter.id} className="scene">
-          <Cmp step={stepper.cursor.step} />
+          <Cmp step={stepper.cursor.step} timeMs={renderTimeMs ?? undefined} />
         </div>
       </Stage>
       {renderGlobalStep == null && (

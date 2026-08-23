@@ -124,3 +124,27 @@ test("chapter titles do not leak evidence types into unrelated steps", () => {
   assert.equal(visuals[0].continuity.artifactType, "none");
   assert.equal(visuals[1].continuity.artifactType, "none");
 });
+
+test("legacy storyboards are upgraded with semantic objects and relations", () => {
+  const [visual] = buildChapterVisuals({
+    id: "mechanism",
+    title: "它为什么能运转",
+    steps: ["Agent 会拆任务并继续推进"],
+    visuals: [{
+      kind: "agent-run",
+      storyboard: {
+        sceneType: "workflow",
+        layout: "sequence",
+        entities: ["目标", "任务步骤", "执行结果"],
+        actionSequence: ["拆分任务", "执行步骤", "检查结果"],
+      },
+    }],
+  });
+
+  assert.deepEqual(visual.storyboard.contentObjects.map((object) => object.label), [
+    "目标",
+    "任务步骤",
+    "执行结果",
+  ]);
+  assert.equal(visual.storyboard.relations.length, 2);
+});
